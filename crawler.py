@@ -555,16 +555,12 @@ class SkyCrawler:
         """
         Translates Japanese Sky quests to Traditional Chinese.
         """
-        # 1. Map Locations
-        loc_map = {
-            '孤島': '晨島', '草原': '雲野', '雨林': '雨林', '峡谷': '霞谷', 
-            '捨てられた地': '暮土', '書庫': '禁閣'
-        }
-        for jp, tc in loc_map.items():
-            text = text.replace(jp, tc)
-
-        # 2. Specific Terms & Phrases Map
+        # [Merged] Map Locations & Terms (Sorted by length to avoid partial replace)
         terms = {
+            # Locations
+            '孤島': '晨島', '草原': '雲野', '雨林': '雨林', '峡谷': '霞谷', 
+            '捨てられた地': '暮土', '書庫': '禁閣',
+
             # Meta
             'クエスト': '任務', 'デイリー': '每日', 
             
@@ -595,11 +591,16 @@ class SkyCrawler:
             '食卓': '長桌/餐桌', '整える': '整理/打掃', 
             'テーブル': '長桌',
             
-            # Valley Quests (Valley of Triumph) - User Request
+            # Valley Quests (Valley of Triumph) - User Match
             '峡谷を訪れしばしの間若木を愛でる': '欣賞一下霞谷小樹苗',
             '峡谷の若木を愛でる': '欣賞一下霞谷小樹苗',
             '若木': '小樹苗', '愛でる': '欣賞一下',
+            
+            '峡谷で光をつかまえる': '抓住霞谷之光', # Full sentence match
+            '峡谷で精霊の記憶を呼び起こす': '重溫一位霞谷先靈的記憶', # Full sentence match
             '精霊の記憶を呼び起こす': '重溫一位先靈的記憶',
+
+            '20本のキャンドルに火を灯す': '點亮 20 根蠟燭', # Full sentence match
             'キャンドルに火を灯す': '點亮蠟燭',
             '20本': '20根', 
             '本': '根',
