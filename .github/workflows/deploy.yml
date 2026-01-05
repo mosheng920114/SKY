@@ -1,0 +1,51 @@
+name: Daily Sky Update
+
+on:
+  schedule:
+    # 每天 UTC 00:00 (台灣時間 08:00) 執行一次
+    # 如果希望更頻繁更新，例如每 4 小時：'0 */4 * * *'
+    - cron: '0,30 * * * *'
+  workflow_dispatch: # 允許手動執行
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium
+
+
+      - name: Run Auto Build Script
+        run: |
+          python auto_build.py
+
+      - name: Commit and Push changes
+        run: |
+          # 設定 Git 使用者身分 (GitHub Actions Bot)
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 加入生成的 index.html
+          git add index.html
+          
+          # 檢查是否有變更
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update dashboard: $(date)"
+            git push origin main
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

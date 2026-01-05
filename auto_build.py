@@ -1,0 +1,60 @@
+import asyncio
+import os
+import sys
+from crawler import SkyCrawler
+import web_exporter
+
+async def main():
+    print("Starting auto_build process...")
+    
+    # 1. Initialize Crawler
+    crawler = SkyCrawler()
+    
+    try:
+        print("Starting crawler...")
+        await crawler.start()
+        
+        # 2. Fetch Data
+        print("Fetching data (Shards, Dailies, Clock)...")
+        shards_task = asyncio.create_task(crawler.get_shards_info())
+        dailies_task = asyncio.create_task(crawler.get_dailies_info())
+        clock_task = asyncio.create_task(crawler.get_clock_info())
+        
+        shards, dailies, clock = await asyncio.gather(shards_task, dailies_task, clock_task)
+        
+        print("Data fetched successfully.")
+        # Debug prints
+        # print(f"Shards: {shards}")
+        # print(f"Dailies keys: {dailies.keys()}")
+        # print(f"Clock keys: {clock.keys()}")
+
+    except Exception as e:
+        print(f"Error during crawling: {e}")
+        shards, dailies, clock = {}, {}, {}
+    finally:
+        await crawler.stop()
+        print("Crawler stopped.")
+
+    # 3. Generate HTML
+    try:
+        print("Generating HTML dashboard...")
+        # web_exporter.generate_dashboard returns the absolute path of the generated file
+        # It defaults to "dashboard.html" in current dir
+        generated_path = web_exporter.generate_dashboard(shards, dailies, clock)
+        
+        # 4. Rename to index.html for GitHub Pages
+        target_path = os.path.join(os.path.dirname(generated_path), "index.html")
+        
+        # Remove existing index.html if it exists
+        if os.path.exists(target_path):
+            os.remove(target_path)
+            
+        os.rename(generated_path, target_path)
+        print(f"SUCCESS: Dashboard generated at {target_path}")
+        
+    except Exception as e:
+        print(f"Error generating/renaming HTML: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())
