@@ -695,7 +695,7 @@ class SkyCrawler:
                 const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
                 
                 // Treasure
-                const tHeaders = Array.from(document.querySelectorAll('h1, h2, h3, h4, div'));
+                const tHeaders = Array.from(document.querySelectorAll('h2, h3, h4')); // STRICT SELECTION
                 const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
                 if (tHeader) {
                     // Try to map text "暮土" etc
@@ -705,6 +705,19 @@ class SkyCrawler:
                     else if (text.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
                     else if (text.includes("暮土") || text.includes("捨てられた地") || text.includes("墓場")) results.treasure_realm = "Golden Wasteland";
                     else if (text.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
+                    
+                    // If Header text doesn't have realm, check IMMEDIATE next sibling only if it's text
+                    if (!results.treasure_realm) {
+                         const next = tHeader.nextElementSibling;
+                         if (next && next.tagName === 'P') {
+                             const pText = next.innerText;
+                             if (pText.includes("草原")) results.treasure_realm = "Daylight Prairie";
+                             else if (pText.includes("雨林")) results.treasure_realm = "Hidden Forest";
+                             else if (pText.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
+                             else if (pText.includes("暮土") || pText.includes("捨てられた地")) results.treasure_realm = "Golden Wasteland";
+                             else if (pText.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
+                         }
+                    }
                     
                     let curr = tHeader.nextElementSibling;
                     let range = 0;
