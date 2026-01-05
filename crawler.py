@@ -376,7 +376,12 @@ class SkyCrawler:
                         foundImgs.forEach(img => {
                             if (img.width > 40 || img.classList.contains('thumbimage')) {
                                 const src = img.getAttribute('data-src') || img.src;
-                                if (src && !src.includes('data:image')) imgs.push(src);
+                                if (src && !src.includes('data:image')) {
+                                    // Clean URL: remove scaling to get full size
+                                    // e.g. /revision/latest/scale-to-width-down/300?cb=... -> /revision/latest?cb=...
+                                    let cleanSrc = src.replace(/\/scale-to-width-down\/\d+/, "");
+                                    imgs.push(cleanSrc);
+                                }
                             }
                         });
                         curr = curr.nextElementSibling;
