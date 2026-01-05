@@ -830,6 +830,170 @@ class SkyCrawler:
             print(f"計算時鐘錯誤: {e}")
             return None
 
+    async def get_all_daily_info_optimized(self):
+        """
+        Consolidated scraper to fetch BOTH Quests and Candles in one navigation.
+        Avoids resource contention and ensures correct page context.
+        """
+        page = None
+        quests = []
+        candles = {
+            "treasure": {"realm": "NotFound", "rotation": "Rotation 1", "images": [], "descriptions": []},
+            "seasonal": {"realm": "", "rotation": "Rotation 1", "images": [], "descriptions": []}
+        }
+        
+        try:
+            print("Fetching All Daily Info (Optimized)...")
+            page = await self.context.new_page()
+            
+            # 1. Homepage -> Find Link
+            await page.goto("https://9-bit.jp/skygold/", wait_until="domcontentloaded", timeout=60000)
+            target_url = await page.evaluate('''() => {
+                const links = Array.from(document.querySelectorAll('a'));
+                const target = links.find(a => a.innerText.includes('今日のデイリークエスト'));
+                return target ? target.href : null;
+            }''')
+            
+            if target_url:
+                print(f"DEBUG: Found Daily Post URL: {target_url}")
+                await page.goto(target_url, wait_until="domcontentloaded")
+            else:
+                print("DEBUG: Stayed on Homepage (Link not found)")
+
+            # 2. Scrape Quests (Text)
+            content_text = await page.evaluate("document.body.innerText")
+            lines = content_text.split('\\n')
+            
+            # Quest Logic (Copied & Refined)
+            header_pattern = re.compile(r'(今日.*デイリークエスト|デイリークエスト.*1月|デイリークエスト.*2月|デイリークエスト.*3月|デイリークエスト.*4月|デイリークエスト.*5月|デイリークエスト.*6月|デイリークエスト.*7月|デイリークエスト.*8月|デイリークエスト.*9月|デイリークエスト.*10月|デイリークエスト.*11月|デイリークエスト.*12月)')
+            collecting = False
+            
+            for line in lines:
+                line = line.strip()
+                if not line: continue
+                
+                if header_pattern.search(line) and not collecting:
+                    print(f"DEBUG: Quest Header Candidate: {line}")
+                    collecting = True
+                    continue
+                
+                if collecting:
+                    if "季節のキャンドル" in line or "大キャンドル" in line or "ソーシャルライト" in line:
+                         break # End of section
+                    
+                    if "完了すると" in line or "報酬" in line or "方法" in line or "確認" in line:
+                        continue
+                        
+                    normalized = line.replace('：', ':').replace('.', '').strip()
+                    if len(normalized) < 2: continue
+                    
+                    c_line = normalized
+                    translated = self.translate_quest(c_line)
+                    quests.append(translated)
+                    
+                    if len(quests) >= 4:
+                        break
+
+            # 3. Scrape Candles (DOM)
+            nine_bit_data = await page.evaluate('''() => {
+                const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
+                 const tHeaders = Array.from(document.querySelectorAll('h2, h3, h4')); 
+                 
+                 // Treasure
+                 const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
+                 if (tHeader) {
+                    const text = tHeader.innerText;
+                    if (text.includes("草原")) results.treasure_realm = "Daylight Prairie";
+                    else if (text.includes("雨林")) results.treasure_realm = "Hidden Forest";
+                    else if (text.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
+                    else if (text.includes("暮土") || text.includes("捨てられた地") || text.includes("墓場")) results.treasure_realm = "Golden Wasteland";
+                    else if (text.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
+                    
+                    if (!results.treasure_realm) {
+                         const next = tHeader.nextElementSibling;
+                         if (next && next.tagName === 'P') {
+                             const pText = next.innerText;
+                             if (pText.includes("草原")) results.treasure_realm = "Daylight Prairie";
+                             else if (pText.includes("雨林")) results.treasure_realm = "Hidden Forest";
+                             else if (pText.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
+                             else if (pText.includes("暮土") || pText.includes("捨てられた地")) results.treasure_realm = "Golden Wasteland";
+                             else if (pText.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
+                         }
+                    }
+                    
+                    let curr = tHeader.nextElementSibling;
+                    let range = 0;
+                    while(curr && range < 5) {
+                        const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                        if (img) { results.treasure_img = img.src; break; }
+                        curr = curr.nextElementSibling;
+                        range++;
+                    }
+                 }
+                 
+                 // Seasonal
+                 const sHeader = tHeaders.find(h => h.innerText.includes('今日のシーズンキャンドル'));
+                 if (sHeader) {
+                     const text = sHeader.innerText;
+                     if (text.includes("草原")) results.seasonal_realm = "Daylight Prairie";
+                     else if (text.includes("雨林")) results.seasonal_realm = "Hidden Forest";
+                     else if (text.includes("峡谷")) results.seasonal_realm = "Valley of Triumph";
+                     else if (text.includes("暮土") || text.includes("捨てられた地") || text.includes("墓場")) results.seasonal_realm = "Golden Wasteland";
+                     else if (text.includes("書庫")) results.seasonal_realm = "Vault of Knowledge";
+                     
+                    let curr = sHeader.nextElementSibling;
+                    let range = 0;
+                    while(curr && range < 5) {
+                        const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                        if (img) { results.seasonal_img = img.src; break; }
+                        curr = curr.nextElementSibling;
+                        range++;
+                    }
+                 }
+                 return results;
+            }''')
+
+            await page.close()
+
+            # Process Treasure
+            t_realm = nine_bit_data.get('treasure_realm', 'NotFound')
+            t_imgs = [nine_bit_data['treasure_img']] if nine_bit_data.get('treasure_img') else []
+            t_rot = "Rotation 1"
+            
+            if datetime.now().weekday() == 6:
+                t_rot = "Rotation 1 and 2"
+                print(f"DEBUG: Sunday detected, forcing Double Treasure Candles")
+            
+            # Fallback
+            if t_realm == "NotFound" or not t_realm:
+                 try:
+                    realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
+                    anchor = datetime(2026, 1, 5)
+                    diff = (datetime.now().date() - anchor.date()).days
+                    idx = (diff + 3) % 5
+                    t_realm = realms[idx]
+                    print(f"DEBUG: Calculated Treasure Realm Fallback: {t_realm}")
+                 except Exception as e:
+                    print(f"Fallback Calc Error: {e}")
+            
+            candles['treasure']['realm'] = t_realm
+            candles['treasure']['rotation'] = t_rot
+            candles['treasure']['images'] = t_imgs
+            candles['treasure']['descriptions'] = candle_data.get_treasure_desc(t_realm, t_rot)
+            
+            # Process Seasonal
+            s_realm = nine_bit_data.get('seasonal_realm', '')
+            candles['seasonal']['realm'] = s_realm
+            if s_realm:
+                candles['seasonal']['images'] = [nine_bit_data.get('seasonal_img')] if nine_bit_data.get('seasonal_img') else []
+                candles['seasonal']['descriptions'] = candle_data.get_seasonal_desc(s_realm)
+
+        except Exception as e:
+             print(f"Combined Scraper Error: {e}")
+             if page: await page.close()
+        
+        return quests, candles
+
 if __name__ == "__main__":
     async def main():
         c = SkyCrawler()

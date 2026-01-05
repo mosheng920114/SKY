@@ -17,11 +17,11 @@ async def main():
         # 2. Fetch Data
         print("Fetching data (Shards, Dailies, Clock, Quests)...")
         shards_task = asyncio.create_task(crawler.get_shards_prediction())
-        dailies_task = asyncio.create_task(crawler.get_dailies_info())
+        optimized_task = asyncio.create_task(crawler.get_all_daily_info_optimized())
         clock_task = asyncio.create_task(crawler.get_clock_info())
-        quests_task = asyncio.create_task(crawler.get_daily_quests())
         
-        shards, dailies, clock, quests = await asyncio.gather(shards_task, dailies_task, clock_task, quests_task)
+        # Return format: shards, (quests, dailies), clock
+        shards, (quests, dailies), clock = await asyncio.gather(shards_task, optimized_task, clock_task)
         
         print("Data fetched successfully.")
         # Debug prints
