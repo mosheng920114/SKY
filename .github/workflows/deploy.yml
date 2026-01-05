@@ -36,8 +36,9 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 加入生成的 index.html
+          # 加入生成的 index.html 和 images 資料夾
           git add index.html
+          git add images/
           
           # 檢查是否有變更
           if git diff --staged --quiet; then

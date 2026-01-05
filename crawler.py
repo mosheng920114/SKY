@@ -1061,10 +1061,10 @@ class SkyCrawler:
                                                 // Fandom Lazy Loading: data-src usually holds the real URL
                                                 let src = img.getAttribute('data-src') || img.src;
                                                 if (src) {
-                                                    // Fandom specific cleanup (remove scale params if needed, but raw is fine)
-                                                    if (src.includes('/revision/latest')) {
-                                                        // src is usually fine
-                                                    }
+                                                    // Fandom specific cleanup: Remove /scale-to-width-down/... params to get full size?
+                                                    // Actually raw src is usually fine, but let's clean it just in case
+                                                    // example: .../image.jpg/revision/latest/scale-to-width-down/233?cb=...
+                                                    // leaving it as is usually works for download, but keeping "revision/latest" is safer.
                                                     results.images.push(src);
                                                 }
                                             });
@@ -1082,10 +1082,42 @@ class SkyCrawler:
                 # Process Fandom Data
                 t_realm = fandom_data.get('realm', 'Golden Wasteland') # Fallback if parse fails
                 f_rot_str = fandom_data.get('rotation_str', '')
-                t_imgs = fandom_data.get('images', [])
+                raw_imgs = fandom_data.get('images', [])
+                
+                # Download Images Locally
+                import os
+                import requests
+                
+                if not os.path.exists("images"):
+                    os.makedirs("images")
+                    
+                local_imgs = []
+                for i, url in enumerate(raw_imgs):
+                    try:
+                        ext = "jpg"
+                        if ".png" in url: ext = "png"
+                        filename = f"images/treasure_{i+1}.{ext}"
+                        
+                        # Simple download
+                        # HEADERS are important for Wiki to accept the request
+                        headers = {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        }
+                        r = requests.get(url, headers=headers, timeout=10)
+                        if r.status_code == 200:
+                            with open(filename, "wb") as f:
+                                f.write(r.content)
+                            local_imgs.append(filename)
+                            print(f"Downloaded: {filename}")
+                        else:
+                            print(f"Failed to download image: {url} (Status: {r.status_code})")
+                    except Exception as e:
+                        print(f"Image Download Error: {e}")
+                
+                t_imgs = local_imgs
                 
                 # Determine Rotation Key
-                t_rot = "Rotation 1"
+                t_rot = "Rotation 1"   
                 # Robust check for "1 and 2"
                 lower_rot = f_rot_str.lower()
                 has_1 = "rotation 1" in lower_rot
