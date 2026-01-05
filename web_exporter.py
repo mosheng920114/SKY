@@ -25,7 +25,7 @@ def parse_countdown_to_seconds(countdown_str):
     except:
         return 0
 
-def generate_dashboard(shards, dailies, clock):
+def generate_dashboard(shards, dailies, clock, quests=None):
     """
     生成高美感 HTML 儀表板。
     """
@@ -41,15 +41,18 @@ def generate_dashboard(shards, dailies, clock):
         <div class="card">
             <div class="card-header">
                 <h2>每日碎石 (Shards)</h2>
-                <span class="badge {shards.get('type', 'Unknown')}">{shards.get('type')}</span>
+                <div class="row-center">
+                     <span class="badge {shards.get('type', 'Unknown')}">{shards.get('type')}</span>
+                </div>
             </div>
             <div class="card-body">
-                <div class="info-row"><strong>地圖：</strong> {shards.get('map')} - {shards.get('area')}</div>
-                <div class="info-row"><strong>獎勵：</strong> {shards.get('rewards')}</div>
+                <div class="info-row highlight-row"><strong>日期：</strong> {shards.get('dateText', '')}</div>
+                <div class="info-row"><strong>地圖：</strong> {shards.get('map')}</div>
+                <div class="info-row"><strong>獎勵：</strong> <span class="rewards-text">{shards.get('rewards') if shards.get('rewards') else '未知 / Unknown'}</span></div>
                 <div class="info-row"><strong>時間：</strong> {shards.get('time_range')}</div>
                 <div class="info-row"><strong>狀態：</strong> {shards.get('remaining', '')}</div>
                 <div class="eruptions-list">
-                    <strong>爆發時間：</strong>
+                    <strong>爆發時間 (24H)：</strong>
                     <div class="tags">{eruptions_html}</div>
                 </div>
                 {img_html}
@@ -58,6 +61,23 @@ def generate_dashboard(shards, dailies, clock):
         '''
     else:
         shard_html = '<div class="card error">無法獲取碎石資訊</div>'
+
+    # Quests (每日任務)
+    quest_html = ""
+    if quests:
+        items_html = "".join([f'<div class="quest-item"><span class="num">{i+1}</span> {q}</div>' for i, q in enumerate(quests)])
+        quest_html = f'''
+        <div class="card">
+            <div class="card-header">
+                <h2>每日任務 (Quests)</h2>
+            </div>
+            <div class="card-body">
+                <div class="quest-list">{items_html}</div>
+            </div>
+        </div>
+        '''
+    else:
+        quest_html = '<div class="card error">無法獲取每日任務</div>'
 
     # Candles Helper (蠟燭助手)
     def build_candle_card(title, data, is_seasonal=False):
@@ -157,17 +177,39 @@ def generate_dashboard(shards, dailies, clock):
     # Inject Shard Data for JS
     shard_times_json = "[]"
     if shards and 'eruptions' in shards:
-        # Assuming format "HH:MM - HH:MM" or similar
-        # We'll pass the list as strings and parse in JS
+        # CONVERT CHINESE TIME TO 24H HH:MM FOR JS
+        # format: "下午07:38:40 - 下午11:30:00"
         import json
-        shard_times_json = json.dumps(shards.get('eruptions', []))
+        clean_times = []
+        for t_range in shards.get('eruptions', []):
+            try:
+                # Regex to find time parts
+                parts = t_range.split('-')
+                if len(parts) == 2:
+                    
+                    def to_24h(s):
+                        s = s.strip()
+                        prefix = s[:2]
+                        body = s[2:].split(':')
+                        h = int(body[0])
+                        m = int(body[1])
+                        if "下午" in prefix and h < 12: h += 12
+                        elif "上午" in prefix and h == 12: h = 0
+                        return f"{h:02d}:{m:02d}"
+
+                    t1 = to_24h(parts[0])
+                    t2 = to_24h(parts[1])
+                    clean_times.append(f"{t1}-{t2}")
+            except:
+                pass
+        
+        shard_times_json = json.dumps(clean_times)
 
     # HTML Template
     html_content = f"""<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sky: Children of the Light Daily Dashboard</title>
     <style>
@@ -191,6 +233,26 @@ def generate_dashboard(shards, dailies, clock):
             padding: 20px;
             overflow-x: hidden;
         }}
+        
+        .quest-list .quest-item {{
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.1em;
+        }}
+        .quest-list .quest-item:last-child {{ border-bottom: none; }}
+        .quest-item .num {{ 
+            color: var(--accent); 
+            font-weight: bold; 
+            margin-right: 10px;
+        }}
+        
+        .highlight-row {{ 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }}
+        .rewards-text {{ color: #ffd700; }}
 
         h1, h2, h3 {{ margin: 0; }}
 
@@ -313,8 +375,11 @@ def generate_dashboard(shards, dailies, clock):
     </div>
 
     <div class="grid-container">
-        <!-- Column 1: Shards -->
-        {shard_html}
+        <!-- Column 1: Shards & Quests -->
+        <div class="column-wrapper" style="display:flex; flex-direction:column; gap:20px;">
+            {shard_html}
+            {quest_html}
+        </div>
         
         <!-- Column 2: Treasures -->
         {treasure_html}

@@ -2,7 +2,6 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sky: Children of the Light Daily Dashboard</title>
     <style>
@@ -26,6 +25,26 @@
             padding: 20px;
             overflow-x: hidden;
         }
+        
+        .quest-list .quest-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.1em;
+        }
+        .quest-list .quest-item:last-child { border-bottom: none; }
+        .quest-item .num { 
+            color: var(--accent); 
+            font-weight: bold; 
+            margin-right: 10px;
+        }
+        
+        .highlight-row { 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        .rewards-text { color: #ffd700; }
 
         h1, h2, h3 { margin: 0; }
 
@@ -144,78 +163,93 @@
 
     <div class="header">
         <h1>Sky: Children of the Light</h1>
-        <div class="timestamp">更新時間 (Updated)：2026-01-05 14:06:05</div>
+        <div class="timestamp">更新時間 (Updated)：2026-01-05 18:00:12</div>
     </div>
 
     <div class="grid-container">
-        <!-- Column 1: Shards -->
-        
+        <!-- Column 1: Shards & Quests -->
+        <div class="column-wrapper" style="display:flex; flex-direction:column; gap:20px;">
+            
         <div class="card">
             <div class="card-header">
                 <h2>每日碎石 (Shards)</h2>
-                <span class="badge 今天沒有碎石 (No Shard)">今天沒有碎石 (No Shard)</span>
+                <div class="row-center">
+                     <span class="badge 紅石 (Red)">紅石 (Red)</span>
+                </div>
             </div>
             <div class="card-body">
-                <div class="info-row"><strong>地圖：</strong> [未知日期] 無 - None</div>
-                <div class="info-row"><strong>獎勵：</strong> 無</div>
-                <div class="info-row"><strong>時間：</strong> 無</div>
-                <div class="info-row"><strong>狀態：</strong> </div>
+                <div class="info-row highlight-row"><strong>日期：</strong> 2026年1月5日 星期一</div>
+                <div class="info-row"><strong>地圖：</strong> 禁閣 的 星漠沙灘</div>
+                <div class="info-row"><strong>獎勵：</strong> <span class="rewards-text">獎勵可達 3.5 支昇華蠟燭</span></div>
+                <div class="info-row"><strong>時間：</strong> 下午07:38:40 - 下午11:30:00</div>
+                <div class="info-row"><strong>狀態：</strong> 距離開始: 1:38:38</div>
                 <div class="eruptions-list">
-                    <strong>爆發時間：</strong>
-                    <div class="tags"></div>
+                    <strong>爆發時間 (24H)：</strong>
+                    <div class="tags"><span class="tag">下午07:38:40 - 下午11:30:00</span><span class="tag">上午01:38:40 - 上午05:30:00</span><span class="tag">上午07:38:40 - 上午11:30:00</span></div>
                 </div>
                 
             </div>
         </div>
         
+            
+        <div class="card">
+            <div class="card-header">
+                <h2>每日任務 (Quests)</h2>
+            </div>
+            <div class="card-body">
+                <div class="quest-list"><div class="quest-item"><span class="num">1</span> 20根的點亮蠟燭</div><div class="quest-item"><span class="num">2</span> 霞谷を訪れしばし的間花樹/幼苗を賞花(在旁待60秒)</div><div class="quest-item"><span class="num">3</span> 霞谷在抓住之光</div><div class="quest-item"><span class="num">4</span> 霞谷在重溫一位先靈的記憶</div></div>
+            </div>
+        </div>
+        
+        </div>
         
         <!-- Column 2: Treasures -->
         
         <div class="card">
             <div class="card-header">
                 <h2>大蠟燭 (Treasure)</h2>
-                <span class="subtitle">Valley of Triumph | Rotation 1 and 2</span>
+                <span class="subtitle">Golden Wasteland | Rotation 1 and 2</span>
             </div>
             <div class="card-body scrollable">
                 <div class="pair-grid">
                 <div class="pair-item">
-                    <div class="desc"><span class="num">1</span> 社交空間/大廳：位於區域左側，靠近衣櫃旁邊。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/f/f7/Daily-Treasure-Candle-Valley-Lobby-Closets.png/revision/latest?cb=20240605152929" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">1</span> 暮土大廳 (Social Space)：前往第一張圖的雙人門前</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/5/57/Daily-Treasure-Candle-Wasteland-Lobby-Block.png/revision/latest?cb=20240220053846" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">2</span> 溜冰場：位於區域中央，通往霞光城橋樑上。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/c/c3/Daily-Treasure-Candle-Ice-Rink-Bridge-Top.png/revision/latest?cb=20240224204402" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">2</span> 破敗神殿 (Broken Temple)：入口右側</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/b/b1/Daily-Treasure-Candle-Broken-Temple-Exit.png/revision/latest?cb=20240220053849" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">3</span> 霞光城/城堡：通過第一個拱門後，位於第二個平臺上。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/e/e3/Daily-Treasure-Candle-Citadel-Arch-Entrance.png/revision/latest?cb=20240224204357" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">3</span> 四龍圖 (Graveyard)：第二個有螃蟹點燃架的小亭子旁</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/7/7f/Daily-Treasure-Candle-Graveyard-Skull.png/revision/latest?cb=20240220053851" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">4</span> 競技場/體育館：位於左側邊緣，看臺底部。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/c/cb/Daily-Treasure-Candle-Coliseum-Bleachers-Left.png/revision/latest?cb=20240224203854" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">4</span> 戰場 (Battlefield)：出口城牆邊緣</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/2/24/Daily-Treasure-Candle-Battlefield-Lamp.png/revision/latest?cb=20240220053853" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">5</span> 社交空間/大廳：位於區域右側，滑道起點處。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/3/3b/Daily-Treasure-Candle-Valley-Lobby-Slope-Right.png/revision/latest?cb=20240229061803" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">5</span> 暮土大廳：左側先祖石碑旁</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/4/4b/Daily-Treasure-Candle-Wasteland-Lobby-Exit-Left.png/revision/latest?cb=20240225081853" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">6</span> 溜冰場：位於冰面上，在橋樑的左側。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/d/dc/Daily-Treasure-Candle-Ice-Rink-Bridge-Left.png/revision/latest?cb=20240229061807" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">6</span> 破敗神殿：神殿內右側角落</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/c/c7/Daily-Treasure-Candle-Broken-Temple-Crab-Pit.png/revision/latest?cb=20240225081850" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">7</span> 霞光城/城堡：經過最高的拱門後，位於第二個平臺上。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/b/b0/Daily-Treasure-Candle-Citadel-Arch-Exit.png/revision/latest?cb=20240229061810" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">7</span> 四龍圖：中央偏左的石柱後面</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/7/75/Daily-Treasure-Candle-Graveyard-Center.png/revision/latest?cb=20240225081858" onclick="openModal(this.src)">
                 </div>
                 
                 <div class="pair-item">
-                    <div class="desc"><span class="num">8</span> 競技場/體育館：位於右側邊緣，看臺底部。</div>
-                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/5/51/Daily-Treasure-Candle-Coliseum-Bleachers-Right.png/revision/latest?cb=20240229061812" onclick="openModal(this.src)">
+                    <div class="desc"><span class="num">8</span> 螃蟹平原 (Crab Fields)：地圖中央的建築廢墟頂部</div>
+                    <img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/2/23/Daily-Treasure-Candle-Shipwreck-Ship-Back.png/revision/latest?cb=20240225081855" onclick="openModal(this.src)">
                 </div>
                 </div>
             </div>
@@ -228,10 +262,10 @@
         <div class="card">
             <div class="card-header">
                 <h2>季節蠟燭 (Seasonal)</h2>
-                <span class="subtitle">Hidden Forest | Rotation 1 and 2</span>
+                <span class="subtitle"></span>
             </div>
             <div class="card-body scrollable">
-                <div class="desc-list"><div class="desc"><span class="num">1</span> 雨林大廳：左側先祖石碑附近。</div><div class="desc"><span class="num">2</span> 雨林大廳：右側先祖石碑附近。</div><div class="desc"><span class="num">3</span> 靜謐庭院（第一張圖）：進入區域後的第一個亭子下方。</div><div class="desc"><span class="num">4</span> 螢光森林（第二張圖）：進入後，在右側有屋簷的走廊起點。</div></div><div class="img-grid"><img src="https://static.wikia.nocookie.net/sky-children-of-the-light/images/8/8f/Hidden-Forest-Seasonal-Candles-locations-Pattern-B.png/revision/latest?cb=20230121024950" onclick="openModal(this.src)"></div>
+                <div class="desc-list"></div><div class="img-grid"></div>
             </div>
         </div>
         
@@ -242,25 +276,25 @@
             </div>
             <div class="card-body">
                 
-            <div class="event-row" id="event-geyser" data-seconds="7142">
+            <div class="event-row" id="event-geyser" data-seconds="304">
                 <div class="event-name">噴泉 (Geyser)</div>
-                <div class="event-time">下次: 14:05</div>
+                <div class="event-time">下次: 18:05</div>
                 <div class="event-countdown">--:--:--</div>
                 <div class="event-status tag waiting">計算中...</div>
             </div>
             
                 
-            <div class="event-row" id="event-grandma" data-seconds="1741">
+            <div class="event-row" id="event-grandma" data-seconds="2104">
                 <div class="event-name">奶奶 (Grandma)</div>
-                <div class="event-time">下次: 14:35</div>
+                <div class="event-time">下次: 18:35</div>
                 <div class="event-countdown">--:--:--</div>
                 <div class="event-status tag waiting">計算中...</div>
             </div>
             
                 
-            <div class="event-row" id="event-turtle" data-seconds="2641">
+            <div class="event-row" id="event-turtle" data-seconds="3004">
                 <div class="event-name">海龜 (Turtle)</div>
-                <div class="event-time">下次: 14:50</div>
+                <div class="event-time">下次: 18:50</div>
                 <div class="event-countdown">--:--:--</div>
                 <div class="event-status tag waiting">計算中...</div>
             </div>
@@ -279,7 +313,7 @@
 
     <script>
         // Data injected from Python
-        const SHARD_TIMES = [];
+        const SHARD_TIMES = ["19:38-23:30", "01:38-05:30", "07:38-11:30"];
 
         // Modal
         function openModal(src) {
@@ -290,7 +324,7 @@
         // --- SHARD LOGIC ---
         function updateShardStatus() {
             // Find existing status element or create one if needed (though we assume one exists from template)
-            // But wait, the template has <div class="info-row"><strong>狀態：</strong> </div>
+            // But wait, the template has <div class="info-row"><strong>狀態：</strong> 距離開始: 1:38:38</div>
             // We should target the text node or a span inside it.
             // Let's look for the row containing "狀態：".
             

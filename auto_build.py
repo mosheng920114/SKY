@@ -15,12 +15,13 @@ async def main():
         await crawler.start()
         
         # 2. Fetch Data
-        print("Fetching data (Shards, Dailies, Clock)...")
-        shards_task = asyncio.create_task(crawler.get_shards_info())
+        print("Fetching data (Shards, Dailies, Clock, Quests)...")
+        shards_task = asyncio.create_task(crawler.get_shards_prediction())
         dailies_task = asyncio.create_task(crawler.get_dailies_info())
         clock_task = asyncio.create_task(crawler.get_clock_info())
+        quests_task = asyncio.create_task(crawler.get_daily_quests())
         
-        shards, dailies, clock = await asyncio.gather(shards_task, dailies_task, clock_task)
+        shards, dailies, clock, quests = await asyncio.gather(shards_task, dailies_task, clock_task, quests_task)
         
         print("Data fetched successfully.")
         # Debug prints
@@ -40,7 +41,7 @@ async def main():
         print("Generating HTML dashboard...")
         # web_exporter.generate_dashboard returns the absolute path of the generated file
         # It defaults to "dashboard.html" in current dir
-        generated_path = web_exporter.generate_dashboard(shards, dailies, clock)
+        generated_path = web_exporter.generate_dashboard(shards, dailies, clock, quests)
         
         # 4. Rename to index.html for GitHub Pages
         target_path = os.path.join(os.path.dirname(generated_path), "index.html")
