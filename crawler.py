@@ -588,15 +588,35 @@ class SkyCrawler:
             'テーブル': '長桌',
             
             # Valley Quests (Valley of Triumph) - User Match
+            # Specific Full Sentence Matches (User Standard)
+            # Valley (User Verified)
             '峡谷を訪れしばしの間若木を愛でる': '欣賞一下霞谷小樹苗',
-            '峡谷の若木を愛でる': '欣賞一下霞谷小樹苗',
-            '若木': '小樹苗', '愛でる': '欣賞一下',
+            '峡谷で光をつかまえる': '抓住霞谷之光',
+            '峡谷で精霊の記憶を呼び起こす': '重溫一位霞谷先靈的記憶',
             
-            '峡谷で光をつかまえる': '抓住霞谷之光', # Full sentence match
-            '峡谷で精霊の記憶を呼び起こす': '重溫一位霞谷先靈的記憶', # Full sentence match
-            '精霊の記憶を呼び起こす': '重溫一位先靈的記憶',
+            # Wasteland
+            '捨てられた地を訪れしばしの間若木を愛でる': '欣賞一下暮土小樹苗',
+            '捨てられた地で光をつかまえる': '抓住暮土之光',
+            '捨てられた地で精霊の記憶を呼び起こす': '重溫一位暮土先靈的記憶',
+            '墓場で精霊の記憶を呼び起こす': '重溫一位暮土先靈的記憶',
+            
+            # Forest
+            '雨林を訪れしばしの間若木を愛でる': '欣賞一下雨林小樹苗',
+            '雨林で光をつかまえる': '抓住雨林之光',
+            '雨林で精霊の記憶を呼び起こす': '重溫一位雨林先靈的記憶',
+            
+            # Prairie
+            '草原を訪れしばしの間若木を愛でる': '欣賞一下雲野小樹苗',
+            '草原で光をつかまえる': '抓住雲野之光',
+            '草原で精霊の記憶を呼び起こす': '重溫一位雲野先靈的記憶',
+            
+            # Vault
+            '書庫を訪れしばしの間若木を愛でる': '欣賞一下禁閣小樹苗',
+            '書庫で光をつかまえる': '抓住禁閣之光',
+            '書庫で精霊の記憶を呼び起こす': '重溫一位禁閣先靈的記憶',
 
-            '20本のキャンドルに火を灯す': '點亮 20 根蠟燭', # Full sentence match
+            '精霊の記憶を呼び起こす': '重溫一位先靈的記憶', # Generic Fallback
+            '20本のキャンドルに火を灯す': '點亮 20 根蠟燭', 
             'キャンドルに火を灯す': '點亮蠟燭',
             '20本': '20根', 
             '本': '根',
@@ -664,214 +684,103 @@ class SkyCrawler:
     async def get_dailies_info(self):
         page = None
         try:
+            print("Fetching Candles from 9-bit (Primary)...")
             page = await self.context.new_page()
-            # Fandom: Use domcontentloaded
             await page.route("**/*", lambda route: route.abort() if route.request.resource_type in ["font", "media", "websocket"] else route.continue_())
             
-            await page.goto("https://sky-children-of-the-light.fandom.com/wiki/Drafts/Dailies", wait_until="domcontentloaded", timeout=60000)
+            await page.goto("https://9-bit.jp/skygold/", wait_until="domcontentloaded", timeout=60000)
             
-            # Wait for content - Fandom is heavy
-            try:
-                await page.wait_for_load_state('networkidle', timeout=10000)
-                await page.wait_for_selector('h2', timeout=30000)
-            except:
-                print("每日任務標題等待逾時 (或被阻擋)")
-
-            # Force Scroll
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(3000)
-
-            # Extract Realm and Rotation Keys
-            result = await page.evaluate('''() => {
-                const data = { treasure: { realm: "", rot: "", imgs: [] }, seasonal: { realm: "", rot: "", imgs: [] } };
+            # Extract 9-bit Data
+            nine_bit_data = await page.evaluate('''() => {
+                const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
                 
-                const processSection = (keywords, isSeasonal) => {
-                    let header = null;
-                    for (const key of keywords.ids) {
-                         const el = document.getElementById(key) || document.querySelector(`span[id*="${key}"]`);
-                         if (el) { header = el.closest('h2') || el.closest('h3'); break; }
-                    }
-                    if (!header) {
-                        const allH = Array.from(document.querySelectorAll('h2, h3'));
-                        header = allH.find(h => keywords.texts.some(t => h.innerText.includes(t)));
-                    }
-
-                    if (!header) return { realm: "NotFound", rot: "", imgs: [] };
-
-                    let realm = "";
-                    let rot = "";
-                    let imgs = [];
+                // Treasure
+                const tHeaders = Array.from(document.querySelectorAll('h1, h2, h3, h4, div'));
+                const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
+                if (tHeader) {
+                    // Try to map text "暮土" etc
+                    const text = tHeader.innerText;
+                    if (text.includes("草原")) results.treasure_realm = "Daylight Prairie";
+                    else if (text.includes("雨林")) results.treasure_realm = "Hidden Forest";
+                    else if (text.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
+                    else if (text.includes("暮土") || text.includes("捨てられた地") || text.includes("墓場")) results.treasure_realm = "Golden Wasteland";
+                    else if (text.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
                     
-                    let curr = header.nextElementSibling;
-                    let textBuffer = "";
-                    let realmKeywords = [];
-                    
-                    // 1. Traverse to find text and initial images
-                    
-                    while (curr && !['H1','H2'].includes(curr.tagName)) {
-                        const text = curr.innerText.trim();
-                        if (text.length > 2) textBuffer += text + " ";
-                        
-                        const foundImgs = curr.querySelectorAll('img');
-                        foundImgs.forEach(img => {
-                            if (img.width > 40 || img.classList.contains('thumbimage')) {
-                                const src = img.getAttribute('data-src') || img.src;
-                                if (src && !src.includes('data:image')) {
-                                     // [FIX] RELAX CSS Cleaning
-                                     // let cleanSrc = src.replace(/\\/scale-to-width-down\\/\\d+/, "");
-                                     let cleanSrc = src; 
-                                     // Only clean if it creates a valid link structure we know
-                                     if (cleanSrc.includes('/revision/latest')) {
-                                         // cleanSrc = cleanSrc.split('/revision/latest')[0] + '/revision/latest'; 
-                                         // Keeping params might be safer for hotlinking
-                                     }
-                                     imgs.push(cleanSrc);
-                                }
-                            }
-                        });
+                    let curr = tHeader.nextElementSibling;
+                    let range = 0;
+                    while(curr && range < 5) {
+                        const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                        if (img) { results.treasure_img = img.src; break; }
                         curr = curr.nextElementSibling;
+                        range++;
                     }
-                    
-                    // 2. Parse Realm
-                    if (textBuffer.includes("Daylight Prairie") || textBuffer.includes("雲野")) { realm = "Daylight Prairie"; realmKeywords = ['prairie', 'daylight']; }
-                    else if (textBuffer.includes("Hidden Forest") || textBuffer.includes("雨林")) { realm = "Hidden Forest"; realmKeywords = ['forest', 'rain']; }
-                    else if (textBuffer.includes("Valley") || textBuffer.includes("霞谷")) { realm = "Valley of Triumph"; realmKeywords = ['valley', 'triumph', 'citadel', 'ice']; }
-                    else if (textBuffer.includes("Wasteland") || textBuffer.includes("暮土")) { realm = "Golden Wasteland"; realmKeywords = ['wasteland', 'golden', 'krill']; }
-                    else if (textBuffer.includes("Vault") || textBuffer.includes("禁閣")) { realm = "Vault of Knowledge"; realmKeywords = ['vault', 'knowledge', 'starlight']; }
-                    
-                    // 3. Parse Rotation (Support double)
-                    if (textBuffer.match(/Rotation\\s*2\\s*(and|&)\\s*3/i)) rot = "Rotation 2 and 3";
-                    else if (textBuffer.match(/Rotation\\s*1\\s*(and|&)\\s*2/i)) rot = "Rotation 1 and 2";
-                    else if (textBuffer.includes("Rotation 1")) rot = "Rotation 1";
-                    else if (textBuffer.includes("Rotation 2")) rot = "Rotation 2";
-                    else if (textBuffer.includes("Rotation 3")) rot = "Rotation 3";
-                    
-                    // 4. Filter Images (Crucial for Seasonal)
-                    if (isSeasonal && realmKeywords.length > 0 && imgs.length > 2) {
-                         const filtered = imgs.filter(src => realmKeywords.some(k => src.toLowerCase().includes(k)));
-                         if (filtered.length > 0) imgs = filtered;
-                    }
+                }
+                
+                // Seasonal
+                const sHeader = tHeaders.find(h => h.innerText.includes('今日のシーズンキャンドル'));
+                if (sHeader) {
+                     const text = sHeader.innerText;
+                     if (text.includes("草原")) results.seasonal_realm = "Daylight Prairie";
+                     else if (text.includes("雨林")) results.seasonal_realm = "Hidden Forest";
+                     else if (text.includes("峡谷")) results.seasonal_realm = "Valley of Triumph";
+                     else if (text.includes("暮土") || text.includes("捨てられた地") || text.includes("墓場")) results.seasonal_realm = "Golden Wasteland";
+                     else if (text.includes("書庫")) results.seasonal_realm = "Vault of Knowledge";
 
-                    return { realm, rot, imgs };
-                };
-                
-                data.treasure = processSection({ids: ['Treasure_Candles', 'Treasure_Candle'], texts: ['Treasure Candles', '大蠟燭']}, false);
-                data.seasonal = processSection({ids: ['Seasonal_Candles', 'Seasonal_Candle'], texts: ['Seasonal Candles', '季節蠟燭']}, true);
-                
-                return data;
+                    let curr = sHeader.nextElementSibling;
+                    let range = 0;
+                    while(curr && range < 5) {
+                        const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                        if (img) { results.seasonal_img = img.src; break; }
+                        curr = curr.nextElementSibling;
+                        range++;
+                    }
+                }
+                return results;
             }''')
-
-            await page.close()
             
-            # Map to Local DB
-            t_info = result['treasure']
-            s_info = result['seasonal']
+            await page.close()
 
-            # Fallback: Scrape 9-bit if Fandom failed (No Realm OR No Images)
-            if t_info['realm'] == "NotFound" or not t_info['realm'] or len(t_info['imgs']) == 0:
-                try:
-                    print("DEBUG: Fandom failed, trying 9-bit for Candles...")
-                    # Re-use page or new page? Page was closed.
-                    page = await self.context.new_page()
-                    await page.goto("https://9-bit.jp/skygold/", wait_until="domcontentloaded")
-                    
-                    nine_bit_data = await page.evaluate('''() => {
-                        const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
-                        
-                        // Treasure
-                        const tHeaders = Array.from(document.querySelectorAll('h1, h2, h3, h4, div'));
-                        const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
-                        if (tHeader) {
-                            // Try to map text "暮土" etc
-                            const text = tHeader.innerText;
-                            if (text.includes("草原")) results.treasure_realm = "Daylight Prairie";
-                            else if (text.includes("雨林")) results.treasure_realm = "Hidden Forest";
-                            else if (text.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
-                            else if (text.includes("暮土") || text.includes("捨てられた地")) results.treasure_realm = "Golden Wasteland";
-                            else if (text.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
-                            
-                            let curr = tHeader.nextElementSibling;
-                            let range = 0;
-                            while(curr && range < 5) {
-                                const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
-                                if (img) { results.treasure_img = img.src; break; }
-                                curr = curr.nextElementSibling;
-                                range++;
-                            }
-                        }
-                        
-                        // Seasonal
-                        const sHeader = tHeaders.find(h => h.innerText.includes('今日のシーズンキャンドル'));
-                        if (sHeader) {
-                             const text = sHeader.innerText;
-                             if (text.includes("草原")) results.seasonal_realm = "Daylight Prairie";
-                             else if (text.includes("雨林")) results.seasonal_realm = "Hidden Forest";
-                             else if (text.includes("峡谷")) results.seasonal_realm = "Valley of Triumph";
-                             else if (text.includes("暮土") || text.includes("捨てられた地")) results.seasonal_realm = "Golden Wasteland";
-                             else if (text.includes("書庫")) results.seasonal_realm = "Vault of Knowledge";
+            # Process Treasure
+            t_realm = nine_bit_data.get('treasure_realm', 'NotFound')
+            t_imgs = [nine_bit_data['treasure_img']] if nine_bit_data.get('treasure_img') else []
+            t_rot = "Rotation 1" # 9-bit doesn't specify rotation explicitly in header usually, assume 1 or calc?
+            # 9-bit images usually show all locations.
+            # I will default to Rotation 1 if found.
+            
+            # Process Seasonal
+            s_realm = nine_bit_data.get('seasonal_realm', '')
+            s_imgs = [nine_bit_data['seasonal_img']] if nine_bit_data.get('seasonal_img') else []
+            s_rot = "Rotation 1"
 
-                            let curr = sHeader.nextElementSibling;
-                            let range = 0;
-                            while(curr && range < 5) {
-                                const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
-                                if (img) { results.seasonal_img = img.src; break; }
-                                curr = curr.nextElementSibling;
-                                range++;
-                            }
-                        }
-                        return results;
-                    }''')
-                    
-                    if nine_bit_data.get('treasure_realm'):
-                        t_info['realm'] = nine_bit_data['treasure_realm']
-                        print(f"DEBUG: 9-bit Treasure Realm: {t_info['realm']}")
-                    if nine_bit_data.get('treasure_img'):
-                        t_info['imgs'] = [nine_bit_data['treasure_img']]
-                        
-                    if nine_bit_data.get('seasonal_realm'):
-                        s_info['realm'] = nine_bit_data['seasonal_realm']
-                        print(f"DEBUG: 9-bit Seasonal Realm: {s_info['realm']}")
-                    if nine_bit_data.get('seasonal_img'):
-                        s_info['imgs'] = [nine_bit_data['seasonal_img']]
-                        
-                    await page.close()
-                except Exception as e:
-                    print(f"9-bit Fallback Error: {e}")
-
-            # Final Fallback for Treasure Realm (Date-based Text)
-            # Only if 9-bit also failed to get TEXT
-            if t_info['realm'] == "NotFound" or not t_info['realm']:
-                try:
-                    # Anchor: 2026-01-05 is Golden Wasteland (Index 3)
+            # Fallback for Treasure Realm (Date-based Text) if 9-bit text extraction failed
+            if t_realm == "NotFound" or not t_realm:
+                 try:
                     realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
                     now = datetime.now()
                     anchor = datetime(2026, 1, 5)
                     diff = (now.date() - anchor.date()).days
                     idx = (diff + 3) % 5
-                    t_info['realm'] = realms[idx]
-                    t_info['rot'] = "Rotation 1" 
-                    print(f"DEBUG: Calculated Treasure Realm Fallback: {t_info['realm']}")
-                except Exception as e:
+                    t_realm = realms[idx]
+                    t_rot = "Rotation 1" 
+                    print(f"DEBUG: Calculated Treasure Realm Fallback: {t_realm}")
+                 except Exception as e:
                     print(f"Fallback Calc Error: {e}")
 
-            # REMOVE SEASONAL FALLBACK (User says no season)
-            # if s_info['realm'] ... -> DELETED logic
+            t_descs = candle_data.get_treasure_desc(t_realm, t_rot)
+            s_descs = candle_data.get_seasonal_desc(s_realm) 
 
-            t_descs = candle_data.get_treasure_desc(t_info['realm'], t_info['rot'])
-            s_descs = candle_data.get_seasonal_desc(s_info['realm']) 
-            
             return {
                 "treasure": {
-                    "realm": t_info['realm'],
-                    "rotation": t_info['rot'],
+                    "realm": t_realm,
+                    "rotation": t_rot,
                     "descriptions": t_descs,
-                    "images": t_info['imgs']
+                    "images": t_imgs
                 },
                 "seasonal": {
-                    "realm": s_info['realm'],
-                    "rotation": s_info['rot'],
+                    "realm": s_realm,
+                    "rotation": s_rot,
                     "descriptions": s_descs,
-                    "images": s_info['imgs']
+                    "images": s_imgs
                 }
             }
 
