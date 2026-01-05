@@ -403,104 +403,96 @@ def generate_dashboard(shards, dailies, clock, quests=None):
 
         // Modal
         function openModal(src) {{
+        function openModal(src) {
             document.getElementById('imgModal').style.display = "flex";
             document.getElementById('modalImg').src = src;
-        }}
+        }
 
         // --- SHARD LOGIC ---
-        function updateShardStatus() {{
-            // Find existing status element or create one if needed (though we assume one exists from template)
-            // But wait, the template has <div class="info-row"><strong>狀態：</strong> {shards.get('remaining', '')}</div>
-            // We should target the text node or a span inside it.
-            // Let's look for the row containing "狀態：".
-            
+        function updateShardStatus() {
             const rows = document.querySelectorAll('.card-body .info-row');
             let statusRow = null;
-            rows.forEach(r => {{
+            rows.forEach(r => {
                 if (r.textContent.includes("狀態：")) statusRow = r;
-            }});
+            });
 
             if (!statusRow || SHARD_TIMES.length === 0) return;
 
             const now = new Date();
             let msg = "今日所有爆發已結束";
-            let found = false;
-
-            // Parse SHARD_TIMES "HH:MM - HH:MM"
-            // We assume these are for today.
             
-            for (let i = 0; i < SHARD_TIMES.length; i++) {{
-                const range = SHARD_TIMES[i];
+            // 1. Parse all times into objects
+            // We'll create simple objects: { start: Date, end: Date, str: "HH:MM-HH:MM" }
+            const events = SHARD_TIMES.map(range => {
                 const parts = range.split('-');
-                if (parts.length < 2) continue;
-
-                const startStr = parts[0].trim();
-                const endStr = parts[1].trim();
+                if (parts.length < 2) return null;
                 
-                // Construct Date objects
-                // Helper to parse "HH:MM"
-                const parseTime = (str) => {{
-                    const [h, m] = str.split(':').map(Number);
-                    const d = new Date(now);
-                    d.setHours(h, m, 0, 0);
-                    return d;
-                }};
-
-                const start = parseTime(startStr);
-                const end = parseTime(endStr);
+                const [h1, m1] = parts[0].trim().split(':').map(Number);
+                const [h2, m2] = parts[1].trim().split(':').map(Number);
                 
-                // Handle edge case if end < start (overnight), add 1 day to end (rare for Shards but safe)
-                if (end < start) end.setDate(end.getDate() + 1);
+                const s = new Date(now); s.setHours(h1, m1, 0, 0);
+                const e = new Date(now); e.setHours(h2, m2, 0, 0);
+                
+                // Handle overnight crossing (e.g. 23:00 - 01:00)
+                if (e < s) e.setDate(e.getDate() + 1);
+                
+                return { start: s, end: e };
+            }).filter(e => e !== null);
+            
+            // 2. Sort by Start Time
+            events.sort((a, b) => a.start - b.start);
+            
+            // 3. Find Active or Next
+            let targetEvent = null;
+            let type = "none"; // active, waiting
+            
+            for (let ev of events) {
+                if (now >= ev.start && now < ev.end) {
+                    targetEvent = ev;
+                    type = "active";
+                    break;
+                }
+                if (now < ev.start) {
+                    targetEvent = ev;
+                    type = "waiting";
+                    break;
+                }
+            }
+            
+            // 4. If nothing found (all passed today), loop to First event of Tomorrow
+            if (!targetEvent && events.length > 0) {
+                targetEvent = { ...events[0] }; // Clone
+                targetEvent.start.setDate(targetEvent.start.getDate() + 1);
+                targetEvent.end.setDate(targetEvent.end.getDate() + 1);
+                type = "waiting";
+            }
 
-                // Logic
-                if (now < start) {{
-                    // Future: Waiting
-                    const diff = (start - now) / 1000;
-                    const dH = Math.floor(diff / 3600);
-                    const dM = Math.floor((diff % 3600) / 60);
-                    const dS = Math.floor(diff % 60);
-                    msg = `等待中 (距離開始: ${{dH}}小時 ${{dM}}分 ${{dS}}秒)`;
-                    found = true;
-                    break; // Found the next one
-                }} else if (now >= start && now < end) {{
-                    // Active
-                    const diff = (end - now) / 1000;
+            // 5. Generate Message
+            if (targetEvent) {
+                if (type === "active") {
+                    const diff = (targetEvent.end - now) / 1000;
                     const dM = Math.floor(diff / 60);
                     const dS = Math.floor(diff % 60);
-                    msg = `進行中! (距離結束: ${{dM}}分 ${{dS}}秒)`;
-                    found = true;
-                    break; // Found current one
-                }}
-                // If now >= end, loop continues to check next slot
-            }}
+                    msg = `進行中! (距離結束: ${dM}分 ${dS}秒)`;
+                } else if (type === "waiting") {
+                     const diff = (targetEvent.start - now) / 1000;
+                     const dH = Math.floor(diff / 3600);
+                     const dM = Math.floor((diff % 3600) / 60);
+                     const dS = Math.floor(diff % 60);
+                     
+                     // Helper: Check if it's tomorrow
+                     const isTom = targetEvent.start.getDate() !== now.getDate();
+                     const prefix = isTom ? "等待中 (明天):" : "等待中:";
+                     msg = `${prefix} ${dH}小時 ${dM}分 ${dS}秒`;
+                }
+            }
 
-            if (!found) {{
-                // All ended. Calculate how long ago.
-                const lastRange = SHARD_TIMES[SHARD_TIMES.length - 1];
-                const parts = lastRange.split('-');
-                if (parts.length >= 2) {{
-                    const endStr = parts[1].trim();
-                    const [h, m] = endStr.split(':').map(Number);
-                    const lastEnd = new Date(now);
-                    lastEnd.setHours(h, m, 0, 0);
-                    
-                    if (now > lastEnd) {{
-                        const diff = (now - lastEnd) / 1000;
-                        const dH = Math.floor(diff / 3600);
-                        const dM = Math.floor((diff % 3600) / 60);
-                        msg = `今日爆發已結束 (已過: ${{dH}}小時 ${{dM}}分)`;
-                    }}
-                }}
-            }}
-
-            // Update DOM
-            // We want to replace the text after "狀態："
-            statusRow.innerHTML = `<strong>狀態：</strong> <span class="shard-status-dynamic">${{msg}}</span>`;
-        }}
+            statusRow.innerHTML = `<strong>狀態：</strong> <span class="shard-status-dynamic">${msg}</span>`;
+        }
 
 
         // --- CLOCK LOGIC ---
-        function isDST(date) {{
+        function isDST(date) {
             const year = date.getFullYear();
             // DST Starts 2nd Sunday in March
             let march = new Date(year, 2, 1); // March 1
