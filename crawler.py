@@ -233,7 +233,23 @@ class SkyCrawler:
                     if (start && end) times.push(start + " - " + end);
                 });
 
-                const img = document.querySelector('img.map_clement');
+                let img = document.querySelector('img.map_clement');
+                if (!img) {
+                    // Fallback 1: Search by src keyword
+                    const allImgs = Array.from(document.querySelectorAll('img'));
+                    img = allImgs.find(i => i.src.toLowerCase().includes('clement') || i.src.toLowerCase().includes('map'));
+                    
+                    // Fallback 2: Search by container header
+                    if (!img) {
+                         const headers = Array.from(document.querySelectorAll('h1, h2, h3, div'));
+                         const mapHeader = headers.find(h => h.innerText.includes('地圖') || h.innerText.includes('Map'));
+                         if (mapHeader) {
+                             // Look in next sibling or parent
+                             const container = mapHeader.parentElement;
+                             img = container.querySelector('img');
+                         }
+                    }
+                }
                 const imgUrl = img ? img.src : null;
                 
                 const statusText = document.querySelector('.shard-Countdown')?.innerText || "";
@@ -342,17 +358,26 @@ class SkyCrawler:
                     if s <= current_dt <= e:
                         # Active
                         diff = e - current_dt
-                        remaining = f"進行中! 距離結束: {str(diff).split('.')[0]}"
+                        total_seconds = int(diff.total_seconds())
+                        h = total_seconds // 3600
+                        m = (total_seconds % 3600) // 60
+                        s_sec = total_seconds % 60
+                        remaining = f"進行中! 距離結束: {h}小時 {m}分 {s_sec}秒"
                         upcoming_range = f"{s_raw} - {e_raw}"
                         active_event = True
                         break
                     elif current_dt < s:
                         # Future
-                        diff = s - current_dt
-                        remaining = f"距離開始: {str(diff).split('.')[0]}"
-                        upcoming_range = f"{s_raw} - {e_raw}"
-                        future_event = True
-                        break
+                        if not future_event:
+                            diff = s - current_dt
+                            total_seconds = int(diff.total_seconds())
+                            h = total_seconds // 3600
+                            m = (total_seconds % 3600) // 60
+                            s_sec = total_seconds % 60
+                            remaining = f"距離開始: {h}小時 {m}分 {s_sec}秒"
+                            upcoming_range = f"{s_raw} - {e_raw}"
+                            future_event = True
+                            break
                 
                 # If neither active nor future found, and we have events, assume ended
                 if not active_event and not future_event:
@@ -570,10 +595,12 @@ class SkyCrawler:
             'テーブル': '長桌',
             
             # Valley Quests (Valley of Triumph) - User Request
+            '峡谷を訪れしばしの間若木を愛でる': '欣賞一下霞谷小樹苗',
             '峡谷の若木を愛でる': '欣賞一下霞谷小樹苗',
             '若木': '小樹苗', '愛でる': '欣賞一下',
             '精霊の記憶を呼び起こす': '重溫一位先靈的記憶',
             'キャンドルに火を灯す': '點亮蠟燭',
+            '20本': '20根', 
             '本': '根',
             
             # General patterns
