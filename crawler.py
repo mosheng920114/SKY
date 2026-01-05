@@ -235,19 +235,20 @@ class SkyCrawler:
 
                 let img = document.querySelector('img.map_clement');
                 if (!img) {
-                    // Fallback 1: Search by src keyword
-                    const allImgs = Array.from(document.querySelectorAll('img'));
-                    img = allImgs.find(i => i.src.toLowerCase().includes('clement') || i.src.toLowerCase().includes('map'));
+                    // Fallback: Search by Header Text specifically for "Map" or "Location"
+                    const headers = Array.from(document.querySelectorAll('h1, h2, h3, div'));
+                    // Target specific headers seen in screenshot: "克萊門特的地圖", "SHATTERING SHARD LOCATION"
+                    const targetHeader = headers.find(h => 
+                        h.innerText.includes('克萊門特的地圖') || 
+                        h.innerText.includes('SHATTERING SHARD LOCATION')
+                    );
                     
-                    // Fallback 2: Search by container header
-                    if (!img) {
-                         const headers = Array.from(document.querySelectorAll('h1, h2, h3, div'));
-                         const mapHeader = headers.find(h => h.innerText.includes('地圖') || h.innerText.includes('Map'));
-                         if (mapHeader) {
-                             // Look in next sibling or parent
-                             const container = mapHeader.parentElement;
-                             img = container.querySelector('img');
-                         }
+                    if (targetHeader) {
+                        // The image is likely in the same container or a sibling container
+                        // Traverse up to find a common wrapper, then look for img
+                        // Or looks like the header is INSIDE the card.
+                        const card = targetHeader.closest('.column') || targetHeader.closest('.card') || targetHeader.parentElement;
+                        if (card) img = card.querySelector('img');
                     }
                 }
                 const imgUrl = img ? img.src : null;
@@ -718,8 +719,14 @@ class SkyCrawler:
                             if (img.width > 40 || img.classList.contains('thumbimage')) {
                                 const src = img.getAttribute('data-src') || img.src;
                                 if (src && !src.includes('data:image')) {
-                                     // [FIX] REMOVE SCALING
-                                     let cleanSrc = src.replace(/\\/scale-to-width-down\\/\\d+/, "");
+                                     // [FIX] RELAX CSS Cleaning
+                                     // let cleanSrc = src.replace(/\\/scale-to-width-down\\/\\d+/, "");
+                                     let cleanSrc = src; 
+                                     // Only clean if it creates a valid link structure we know
+                                     if (cleanSrc.includes('/revision/latest')) {
+                                         // cleanSrc = cleanSrc.split('/revision/latest')[0] + '/revision/latest'; 
+                                         // Keeping params might be safer for hotlinking
+                                     }
                                      imgs.push(cleanSrc);
                                 }
                             }
