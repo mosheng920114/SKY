@@ -2,9 +2,8 @@ name: Daily Sky Update
 
 on:
   schedule:
-    # 每天 UTC 00:00 (台灣時間 08:00) 執行一次
-    # 如果希望更頻繁更新，例如每 4 小時：'0 */4 * * *'
-    - cron: '0,30 * * * *'
+    # 每天 UTC 08:05 (台灣時間 16:05) 執行一次
+    - cron: '5 8 * * *'
   workflow_dispatch: # 允許手動執行
 
 jobs:
