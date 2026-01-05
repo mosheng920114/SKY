@@ -233,7 +233,21 @@ class SkyCrawler:
                     if (start && end) times.push(start + " - " + end);
                 });
 
-                let img = document.querySelector('img.map_clement');
+                // Prioritize 'img.map_clement' BUT verify src
+                let img = null;
+                
+                // 1. Precise Search: src contains "map_varient" (Best for location map)
+                img = document.querySelector('img[src*="map_varient"]');
+                
+                if (!img) {
+                     // 2. Memory Search: src contains "memory"
+                     img = document.querySelector('img[src*="memory"]');
+                }
+                
+                if (!img) {
+                    img = document.querySelector('img.map_clement');
+                }
+                
                 if (!img) {
                     // Fallback: Search by Header Text specifically for "Map" or "Location"
                     const headers = Array.from(document.querySelectorAll('h1, h2, h3, div'));
@@ -497,50 +511,53 @@ class SkyCrawler:
                 for i, line in enumerate(lines):
                      if today_str in line:
                          # Heuristic: check if nearby lines have "クエスト"
-                         start_index = i
-                         print(f"DEBUG: Found Date Only: {line}")
-                         break
-
-            # Fallback to "Daily Quest" header if date not found
-            if start_index == -1:
-                for i, line in enumerate(lines):
-                    if "デイリークエスト" in line and "内容" not in line and "方法" not in line and "今日の" in line:
-                        start_index = i
-                        break
-            
+            # Parse Content
+            content_text = await page.evaluate("document.body.innerText")
+            lines = content_text.split('\n')
             extracted_quests = []
             
-            # Scan Strategy:
-            # 1. If start_index found, scan next 50 lines.
-            target_lines = lines[start_index:] if start_index != -1 else lines
+            # State Machine
+            collecting = False
+            
+            # Regex for date header: "今日（1月5日～1月6日）のデイリークエスト" or "2026年1月5日...クエスト"
+            # And also generic "今日のデイリークエスト" if date is missing
+            header_pattern = re.compile(r'(今日.*デイリークエスト|デイリークエスト.*1月|デイリークエスト.*2月|デイリークエスト.*3月|デイリークエスト.*4月|デイリークエスト.*5月|デイリークエスト.*6月|デイリークエスト.*7月|デイリークエスト.*8月|デイリークエスト.*9月|デイリークエスト.*10月|デイリークエスト.*11月|デイリークエスト.*12月)') 
 
-            candidates = []
-            for line in target_lines:
+            for line in lines:
                 line = line.strip()
                 if not line: continue
-                if len(candidates) >= 4 and start_index != -1: break # Limit if we found header
-                if len(candidates) >= 10: break # Safety limit for global search
                 
-                # Check validity
-                score = 0
-                if any(k in line for k in quest_keywords): score += 2
-                if '集める' in line or '追体験' in line or '片付ける' in line: score += 2
-                if '先祖' in line or '食卓' in line: score += 1
-                if len(line) > 5: score += 1
+                # Check for Header
+                if header_pattern.search(line):
+                    print(f"DEBUG: Found Quest Header: {line}")
+                    collecting = True
+                    extracted_quests = [] # Reset if we find a newer/better header (unlikely but safe)
+                    continue 
                 
-                # Negative
-                if 'とは' in line or '方法' in line or '目次' in line: score -= 10
-                if '攻略' in line or '掲示板' in line: score -= 10
-                if 'シーズンキャンドル' in line: score -= 5 
-                if '大キャンドル' in line: score -= 5 
-                if '▲' in line: score -= 10 # Exclude tips (usually navigation instructions)
-
-
-                
-                if score >= 3:
-                     # Check duplicates
-                     if line not in candidates:
-                        candidates.append(line)
+                if collecting:
+                    # Stop if we hit typical next section headers
+                    if "キャンドル" in line or "闇の破片" in line or "専用通貨" in line or "イベント" in line or "更新" in line:
+                        # But wait, quests might contain "Candle". The section header usually is specific.
+                        if "今日の" in line or "更新履歴" in line:
+                           collecting = False
+                           break
+                    
+                    # Garbage filter
+                    if any(x in line for x in ['攻略', '掲示板', '目次', 'トップ', '詳細', '▲']):
+                        continue
+                        
+                    # Valid Quest Candidate (Length > 5)
+                    if len(line) > 5:
+                         extracted_quests.append(line)
+                         if len(extracted_quests) >= 4:
+                             break
+            
+            # Fallback if strict header failed 
+            if len(extracted_quests) < 4:
+                 print("DEBUG: Strict extraction failed, checking fallback candidates")
+                 candidates = extracted_quests # Keep what we found
+            else:
+                 candidates = extracted_quests
             
             # Debug: Find Dates
             # date_matches = re.findall(r'(\d{1,2}月\d{1,2}日)', content_text)
@@ -780,9 +797,36 @@ class SkyCrawler:
             await page.close()
             
             # Map to Local DB
-            t_info = result['treasure']
-            s_info = result['seasonal']
-            
+            # Fallback for Treasure Realm (Date-based)
+            if t_info['realm'] == "NotFound" or not t_info['realm']:
+                try:
+                    # Anchor: 2026-01-05 is Golden Wasteland (Index 3)
+                    # Realms: Prairie(0), Forest(1), Valley(2), Wasteland(3), Vault(4)
+                    realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
+                    now = datetime.now()
+                    anchor = datetime(2026, 1, 5)
+                    diff = (now.date() - anchor.date()).days
+                    idx = (diff + 3) % 5
+                    t_info['realm'] = realms[idx]
+                    t_info['rot'] = "Rotation 1" # Default fallback
+                    print(f"DEBUG: Calculated Treasure Realm Fallback: {t_info['realm']}")
+                except Exception as e:
+                    print(f"Fallback Calc Error: {e}")
+
+            # Fallback for Seasonal Realm (Usually matches Quest Realm, or Treasure - 1)
+            if s_info['realm'] == "NotFound" or not s_info['realm']:
+                try:
+                    # Anchor: 2026-01-05 Quest/Seasonal is Valley (Index 2)
+                    realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
+                    now = datetime.now()
+                    anchor = datetime(2026, 1, 5)
+                    diff = (now.date() - anchor.date()).days
+                    idx = (diff + 2) % 5
+                    s_info['realm'] = realms[idx]
+                    print(f"DEBUG: Calculated Seasonal Realm Fallback: {s_info['realm']}")
+                except:
+                    pass
+
             t_descs = candle_data.get_treasure_desc(t_info['realm'], t_info['rot'])
             s_descs = candle_data.get_seasonal_desc(s_info['realm']) 
             
