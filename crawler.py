@@ -767,8 +767,8 @@ class SkyCrawler:
             t_info = result['treasure']
             s_info = result['seasonal']
 
-            # Fallback: Scrape 9-bit if Fandom failed
-            if t_info['realm'] == "NotFound" or not t_info['realm']:
+            # Fallback: Scrape 9-bit if Fandom failed (No Realm OR No Images)
+            if t_info['realm'] == "NotFound" or not t_info['realm'] or len(t_info['imgs']) == 0:
                 try:
                     print("DEBUG: Fandom failed, trying 9-bit for Candles...")
                     # Re-use page or new page? Page was closed.
