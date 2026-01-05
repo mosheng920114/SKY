@@ -860,63 +860,75 @@ class SkyCrawler:
             else:
                 print("DEBUG: Stayed on Homepage (Link not found)")
 
-            # 2. Scrape Quests (Text)
-            content_text = await page.evaluate("document.body.innerText")
-            lines = content_text.split('\n')
+            # 2. Scrape Quests (DOM)
+            quest_data_dom = await page.evaluate('''() => {
+                const results = [];
+                const headers = Array.from(document.querySelectorAll('h2, h3, h4'));
+                const qHeader = headers.find(h => 
+                    h.innerText.includes('今日') && 
+                    h.innerText.includes('デイリークエスト') && 
+                    !h.innerText.includes('目次')
+                );
+                
+                if (!qHeader) return { quests: [], date_str: null };
+                
+                let curr = qHeader.nextElementSibling;
+                while (curr && results.length < 4) {
+                    if (['H2', 'H3', 'H4'].includes(curr.tagName) && curr.innerText.includes('クエスト')) {
+                         if (!curr.innerText.includes('一覧')) break; 
+                    }
+                    
+                    const candidates = [];
+                    if (curr.tagName === 'STRONG') candidates.push(curr);
+                    candidates.push(...curr.querySelectorAll('strong'));
+                    candidates.push(...curr.querySelectorAll('li'));
+                    
+                    for (const el of candidates) {
+                        const txt = el.innerText.trim();
+                        if (txt.length > 5 && 
+                            !txt.includes("方法") && 
+                            !txt.includes("報酬") && 
+                            !txt.includes("確認") && 
+                            !txt.includes("精錬") && 
+                            !txt.includes("デイリークエスト") && 
+                            !results.includes(txt)) {
+                            results.push(txt);
+                            if (results.length >= 4) break;
+                        }
+                    }
+                    
+                    if (curr.tagName === 'P' && candidates.length === 0) {
+                        const txt = curr.innerText.trim();
+                        if (txt.length > 5 && !['方法','報酬','確認'].some(k => txt.includes(k))) {
+                             if (txt.includes("精霊") || txt.includes("光") || txt.includes("瞑想") || txt.includes("キャンドル")) {
+                                 results.push(txt);
+                             }
+                        }
+                    }
+                    
+                    curr = curr.nextElementSibling;
+                    if (!curr || (curr.tagName === 'H2' && !curr.innerText.includes('一覧'))) break;
+                }
+                return { quests: results, date_str: qHeader.innerText };
+            }''')
             
-            # Quest Logic (Copied & Refined)
-            header_pattern = re.compile(r'(今日.*デイリークエスト|デイリークエスト.*1月|デイリークエスト.*2月|デイリークエスト.*3月|デイリークエスト.*4月|デイリークエスト.*5月|デイリークエスト.*6月|デイリークエスト.*7月|デイリークエスト.*8月|デイリークエスト.*9月|デイリークエスト.*10月|デイリークエスト.*11月|デイリークエスト.*12月)')
-            date_pattern = re.compile(r'(\d+)月(\d+)日') # Extract Date
-            collecting = False
+            raw_quests = quest_data_dom.get('quests', [])
+            date_str = quest_data_dom.get('date_str', '')
             
+            # Parse Site Date
             site_date_obj = None
+            if date_str:
+                date_match = re.search(r'(\d+)月(\d+)日', date_str)
+                if date_match:
+                    try:
+                        m = int(date_match.group(1))
+                        d = int(date_match.group(2))
+                        site_date_obj = datetime(2025, m, d)
+                        print(f"DEBUG: Parsed Date from Site Header: {site_date_obj.date()} (Weekday: {site_date_obj.weekday()})")
+                    except: pass
             
-            for line in lines:
-                line = line.strip()
-                if not line: continue
-                
-                if header_pattern.search(line) and not collecting:
-                    print(f"DEBUG: Quest Header Candidate: {line}")
-                    
-                    # Try to parse date from this header
-                    d_match = date_pattern.search(line)
-                    if d_match:
-                        try:
-                            m = int(d_match.group(1))
-                            d = int(d_match.group(2))
-                            # Assume 2025 (or current logic year if close). 
-                            # If we use system year 2026, jan 5 is mon. 
-                            # Safe bet: Use 2025 hardcoded for now or detect year? 
-                            # Usually Sky is current year. If users system is 2026, we should probably assume user IS in 2026? 
-                            # But user screenshot implies typical Sunday behavior?
-                            # Let's try to detect if 2025-m-d is Sunday.
-                            # Or just use the parsed date with "current real year 2025".
-                            
-                            # Let's assume 2025.
-                            site_date_obj = datetime(2025, m, d)
-                            print(f"DEBUG: Parsed Date from Site: {site_date_obj.date()} (Weekday: {site_date_obj.weekday()})")
-                        except:
-                            pass
-                            
-                    collecting = True
-                    continue
-                
-                if collecting:
-                    if "季節のキャンドル" in line or "大キャンドル" in line or "ソーシャルライト" in line:
-                         break # End of section
-                    
-                    if "完了すると" in line or "報酬" in line or "方法" in line or "確認" in line:
-                        continue
-                        
-                    normalized = line.replace('：', ':').replace('.', '').strip()
-                    if len(normalized) < 2: continue
-                    
-                    c_line = normalized
-                    translated = self.translate_quest(c_line)
-                    quests.append(translated)
-                    
-                    if len(quests) >= 4:
-                        break
+            # Translate Quests
+            quests = [self.translate_quest(q) for q in raw_quests]
 
             # 3. Scrape Candles (DOM)
             nine_bit_data = await page.evaluate('''() => {
@@ -948,9 +960,12 @@ class SkyCrawler:
                         results.is_double = true;
                     }
                     
-                    // Images
+                    // Images (Deep scan)
+                    // Check standard imgs
                     const imgs = el.querySelectorAll('img');
                     imgs.forEach(img => {
+                         // Filter out logos/icons (simple heuristic size check difficult in pure JS w/o load)
+                         // But usually 9-bit content images are clean.
                          if (img.src && !results.treasure_img.includes(img.src)) {
                              results.treasure_img.push(img.src);
                          }
@@ -968,23 +983,34 @@ class SkyCrawler:
                     if (tElem.tagName === 'STRONG') {
                         container = tElem.closest('p') || tElem.parentElement || tElem;
                     }
+                    
+                    // Scan Container
                     scanElement(container);
+                    
+                    // Scan Next Siblings (Increased Range)
                     let curr = container.nextElementSibling;
-                    let limit = 3;
+                    let limit = 15; // Increased from 3
                     while(curr && limit > 0) {
+                        // Stop if we hit another main header (H2)
+                        // But "Treasure" section might have H3/H4 inside... 
+                        // Usually 9-bit separates sections with H2 or CLEAR dividers.
+                        if (curr.tagName === 'H2') break;
+                        
                         scanElement(curr);
                         curr = curr.nextElementSibling;
                         limit--;
                     }
                  }
                  
-                 // Seasonal header logic remains same
+                 // Seasonal Header
                  let sElem = headings.find(h => h.innerText.includes('今日のシーズンキャンドル'));
                  if (sElem) {
                      let container = sElem;
                      if (sElem.tagName === 'STRONG') {
                         container = sElem.closest('p') || sElem.parentElement || sElem;
                      }
+                     
+                     // Helper for seasonal
                      const scanSeasonal = (el) => {
                         if (!el) return;
                         const text = el.innerText || "";
@@ -1001,10 +1027,12 @@ class SkyCrawler:
                         });
                         if (el.tagName === 'IMG' && el.src && !results.seasonal_img.includes(el.src)) results.seasonal_img.push(el.src);
                      };
+                     
                      scanSeasonal(container);
                      let curr = container.nextElementSibling;
-                     let limit = 3;
+                     let limit = 8; // Increased slightly
                      while(curr && limit > 0) {
+                        if (curr.tagName === 'H2') break;
                         scanSeasonal(curr);
                         curr = curr.nextElementSibling;
                         limit--;
