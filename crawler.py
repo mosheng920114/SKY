@@ -477,43 +477,10 @@ class SkyCrawler:
             print(f"Found Quest URL: {quest_url}")
             await page.goto(quest_url, wait_until="domcontentloaded")
             
-            # 3. Extract Quests (Robust Text Parsing)
-            # Instead of complex JS DOM traversal, get the full text and regex it.
-            # content_text = await page.input_value('body') # REMOVED
-            content_text = await page.evaluate('document.body.innerText')
-            
-            # Key phrases for quests
-            quest_keywords = ['瞑想', '光', 'キャンドル', '精霊', 'プレイヤー', 'フレンド', 'ハイタッチ', 'ハグ', 'おんぶ', 'チャット', 'スケーター', '記憶', '若木']
-            
-            lines = content_text.split('\n')
-            
-            # Find the header "デイリークエスト" or Specific Date
-            start_index = -1
-            
-            # 1. Try finding Today's Date (e.g., "1月5日")
-            # Sky resets at 00:00 PST. 
-            # In Asia (GMT+8), reset is 16:00.
-            # If current time < 16:00, it's still "Yesterday" in Sky logic? 
-            # No, usually 9-bit posts "Today" meaning the *active* day.
-            # Let's try matching Python's local date first.
-            now = datetime.now()
-            today_str = f"{now.month}月{now.day}日"
-            
-            # Scan for date header
-            for i, line in enumerate(lines):
-                if today_str in line and "クエスト" in line: # e.g. "1月5日 デイリークエスト"
-                    start_index = i
-                    print(f"DEBUG: Found Date Header: {line}")
-                    break
-            
-            # Fallback (Just Date)
-            if start_index == -1:
-                for i, line in enumerate(lines):
-                     if today_str in line:
-                         # Heuristic: check if nearby lines have "クエスト"
-            # Parse Content
+            # Parse Content (Clean Start)
             content_text = await page.evaluate("document.body.innerText")
             lines = content_text.split('\n')
+            extracted_quests = []
             extracted_quests = []
             
             # State Machine
