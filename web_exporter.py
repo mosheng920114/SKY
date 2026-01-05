@@ -167,6 +167,7 @@ def generate_dashboard(shards, dailies, clock):
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sky: Children of the Light Daily Dashboard</title>
     <style>
