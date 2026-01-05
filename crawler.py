@@ -764,6 +764,9 @@ class SkyCrawler:
             await page.close()
             
             # Map to Local DB
+            t_info = result['treasure']
+            s_info = result['seasonal']
+
             # Fallback for Treasure Realm (Date-based)
             if t_info['realm'] == "NotFound" or not t_info['realm']:
                 try:
