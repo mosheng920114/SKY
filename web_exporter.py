@@ -403,18 +403,17 @@ def generate_dashboard(shards, dailies, clock, quests=None):
 
         // Modal
         function openModal(src) {{
-        function openModal(src) {
             document.getElementById('imgModal').style.display = "flex";
             document.getElementById('modalImg').src = src;
-        }
+        }}
 
         // --- SHARD LOGIC ---
-        function updateShardStatus() {
+        function updateShardStatus() {{
             const rows = document.querySelectorAll('.card-body .info-row');
             let statusRow = null;
-            rows.forEach(r => {
+            rows.forEach(r => {{
                 if (r.textContent.includes("狀態：")) statusRow = r;
-            });
+            }});
 
             if (!statusRow || SHARD_TIMES.length === 0) return;
 
@@ -422,8 +421,8 @@ def generate_dashboard(shards, dailies, clock, quests=None):
             let msg = "今日所有爆發已結束";
             
             // 1. Parse all times into objects
-            // We'll create simple objects: { start: Date, end: Date, str: "HH:MM-HH:MM" }
-            const events = SHARD_TIMES.map(range => {
+            // We'll create simple objects: {{ start: Date, end: Date, str: "HH:MM-HH:MM" }}
+            const events = SHARD_TIMES.map(range => {{
                 const parts = range.split('-');
                 if (parts.length < 2) return null;
                 
@@ -436,8 +435,8 @@ def generate_dashboard(shards, dailies, clock, quests=None):
                 // Handle overnight crossing (e.g. 23:00 - 01:00)
                 if (e < s) e.setDate(e.getDate() + 1);
                 
-                return { start: s, end: e };
-            }).filter(e => e !== null);
+                return {{ start: s, end: e }};
+            }}).filter(e => e !== null);
             
             // 2. Sort by Start Time
             events.sort((a, b) => a.start - b.start);
@@ -446,35 +445,35 @@ def generate_dashboard(shards, dailies, clock, quests=None):
             let targetEvent = null;
             let type = "none"; // active, waiting
             
-            for (let ev of events) {
-                if (now >= ev.start && now < ev.end) {
+            for (let ev of events) {{
+                if (now >= ev.start && now < ev.end) {{
                     targetEvent = ev;
                     type = "active";
                     break;
-                }
-                if (now < ev.start) {
+                }}
+                if (now < ev.start) {{
                     targetEvent = ev;
                     type = "waiting";
                     break;
-                }
-            }
+                }}
+            }}
             
             // 4. If nothing found (all passed today), loop to First event of Tomorrow
-            if (!targetEvent && events.length > 0) {
-                targetEvent = { ...events[0] }; // Clone
+            if (!targetEvent && events.length > 0) {{
+                targetEvent = {{ ...events[0] }}; // Clone
                 targetEvent.start.setDate(targetEvent.start.getDate() + 1);
                 targetEvent.end.setDate(targetEvent.end.getDate() + 1);
                 type = "waiting";
-            }
+            }}
 
             // 5. Generate Message
-            if (targetEvent) {
-                if (type === "active") {
+            if (targetEvent) {{
+                if (type === "active") {{
                     const diff = (targetEvent.end - now) / 1000;
                     const dM = Math.floor(diff / 60);
                     const dS = Math.floor(diff % 60);
-                    msg = `進行中! (距離結束: ${dM}分 ${dS}秒)`;
-                } else if (type === "waiting") {
+                    msg = `進行中! (距離結束: ${{dM}}分 ${{dS}}秒)`;
+                }} else if (type === "waiting") {{
                      const diff = (targetEvent.start - now) / 1000;
                      const dH = Math.floor(diff / 3600);
                      const dM = Math.floor((diff % 3600) / 60);
@@ -483,18 +482,17 @@ def generate_dashboard(shards, dailies, clock, quests=None):
                      // Helper: Check if it's tomorrow
                      const isTom = targetEvent.start.getDate() !== now.getDate();
                      const prefix = isTom ? "等待中 (明天):" : "等待中:";
-                     msg = `${prefix} ${dH}小時 ${dM}分 ${dS}秒`;
-                }
-            }
+                     msg = `${{prefix}} ${{dH}}小時 ${{dM}}分 ${{dS}}秒`;
+                }}
+            }}
 
-            statusRow.innerHTML = `<strong>狀態：</strong> <span class="shard-status-dynamic">${msg}</span>`;
-        }
+            statusRow.innerHTML = `<strong>狀態：</strong> <span class="shard-status-dynamic">${{msg}}</span>`;
+        }}
 
 
         // --- CLOCK LOGIC ---
-        function isDST(date) {
+        function isDST(date) {{
             const year = date.getFullYear();
-            // DST Starts 2nd Sunday in March
             let march = new Date(year, 2, 1); // March 1
             while (march.getDay() !== 0) march.setDate(march.getDate() + 1);
             const dstStart = new Date(year, 2, march.getDate() + 7); // 2nd Sunday
