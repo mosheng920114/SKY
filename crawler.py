@@ -860,56 +860,97 @@ class SkyCrawler:
             else:
                 print("DEBUG: Stayed on Homepage (Link not found)")
 
-            # 2. Scrape Quests (DOM)
+            # 2. Scrape Quests (DOM - Table Aware)
             quest_data_dom = await page.evaluate('''() => {
                 const results = [];
                 const headers = Array.from(document.querySelectorAll('h2, h3, h4'));
-                const qHeader = headers.find(h => 
-                    h.innerText.includes('今日') && 
-                    h.innerText.includes('デイリークエスト') && 
-                    !h.innerText.includes('目次')
-                );
+                
+                // 1. Try to find the specific "Quest LIST" header first (H3: デイリークエスト一覧)
+                // This is more specific than the main H2 date header and avoids the metadata table.
+                let qHeader = headers.find(h => h.innerText.includes('デイリークエスト一覧'));
+                
+                // Fallback to main header if List header not found
+                if (!qHeader) {
+                    qHeader = headers.find(h => 
+                        h.innerText.includes('今日') && 
+                        h.innerText.includes('デイリークエスト') && 
+                        !h.innerText.includes('目次')
+                    );
+                }
                 
                 if (!qHeader) return { quests: [], date_str: null };
                 
+                // Helper to process text
+                const isValidQuest = (txt) => {
+                    const t = txt.trim();
+                    if (t.length < 5) return false;
+                    if (['方法','報酬','確認','精錬','デイリークエスト','一覧'].some(k => t.includes(k))) return false;
+                    if (t.includes('開始時間') || t.includes('終了時間') || t.includes('対象エリア')) return false; 
+                    if (t.includes('時') && t.includes('分')) return false; // Time filter (Japanese time chars)
+                    if (t.match(/\d{1,2}月\d{1,2}日/)) return false; 
+                    return true;
+                }
+
                 let curr = qHeader.nextElementSibling;
                 while (curr && results.length < 4) {
-                    if (['H2', 'H3', 'H4'].includes(curr.tagName) && curr.innerText.includes('クエスト')) {
-                         if (!curr.innerText.includes('一覧')) break; 
-                    }
+                    // Stop conditions
+                    if (['H2'].includes(curr.tagName) && !curr.innerText.includes('一覧')) break; 
                     
-                    const candidates = [];
-                    if (curr.tagName === 'STRONG') candidates.push(curr);
-                    candidates.push(...curr.querySelectorAll('strong'));
-                    candidates.push(...curr.querySelectorAll('li'));
-                    
-                    for (const el of candidates) {
-                        const txt = el.innerText.trim();
-                        if (txt.length > 5 && 
-                            !txt.includes("方法") && 
-                            !txt.includes("報酬") && 
-                            !txt.includes("確認") && 
-                            !txt.includes("精錬") && 
-                            !txt.includes("デイリークエスト") && 
-                            !results.includes(txt)) {
-                            results.push(txt);
+                    // 1. Check TABLE
+                    if (curr.tagName === 'TABLE') {
+                        // CRITICAL: Check if this is the Metadata Table
+                        const tableText = curr.innerText;
+                        if (tableText.includes('開始時間') || tableText.includes('終了時間') || tableText.includes('対象エリア')) {
+                            // SKIP this entire table
+                            curr = curr.nextElementSibling;
+                            continue;
+                        }
+
+                        const cells = curr.querySelectorAll('td, th');
+                        for (const cell of cells) {
+                            const lines = cell.innerText.split('\\n');
+                            for (const line of lines) {
+                                if (isValidQuest(line) && !results.includes(line)) {
+                                    results.push(line);
+                                    if (results.length >= 4) break;
+                                }
+                            }
                             if (results.length >= 4) break;
                         }
                     }
                     
-                    if (curr.tagName === 'P' && candidates.length === 0) {
-                        const txt = curr.innerText.trim();
-                        if (txt.length > 5 && !['方法','報酬','確認'].some(k => txt.includes(k))) {
-                             if (txt.includes("精霊") || txt.includes("光") || txt.includes("瞑想") || txt.includes("キャンドル")) {
-                                 results.push(txt);
-                             }
+                    // 2. Check LI/STRONG (Legacy/Mobile view)
+                    if (['UL','OL','P','DIV'].includes(curr.tagName) || curr.tagName === 'STRONG') {
+                        const candidates = [];
+                        if (curr.tagName === 'STRONG') candidates.push(curr);
+                        candidates.push(...curr.querySelectorAll('strong'));
+                        candidates.push(...curr.querySelectorAll('li'));
+                        
+                        for (const el of candidates) {
+                            const txt = el.innerText.trim();
+                            // If LI starts with date/time, skip it
+                            if (txt.includes('時') && txt.includes('分')) continue;
+                            
+                            if (isValidQuest(txt) && !results.includes(txt)) {
+                                results.push(txt);
+                                if (results.length >= 4) break;
+                            }
                         }
                     }
-                    
+
                     curr = curr.nextElementSibling;
-                    if (!curr || (curr.tagName === 'H2' && !curr.innerText.includes('一覧'))) break;
                 }
-                return { quests: results, date_str: qHeader.innerText };
+                
+                // Date finding fallback (if we used List header, we might miss the date header)
+                // We try to grab the Date header text separately if needed
+                let dateStr = qHeader.innerText;
+                if (!dateStr.includes('月')) {
+                     // Try to find the Date H2
+                     const dateH2 = headers.find(h => h.innerText.includes('今日') && h.innerText.includes('デイリークエスト'));
+                     if (dateH2) dateStr = dateH2.innerText;
+                }
+                
+                return { quests: results, date_str: dateStr };
             }''')
             
             raw_quests = quest_data_dom.get('quests', [])
@@ -923,7 +964,9 @@ class SkyCrawler:
                     try:
                         m = int(date_match.group(1))
                         d = int(date_match.group(2))
-                        site_date_obj = datetime(2025, m, d)
+                        # Assume 2025 unless we are in Dec and site is Jan
+                        year = 2025
+                        site_date_obj = datetime(year, m, d)
                         print(f"DEBUG: Parsed Date from Site Header: {site_date_obj.date()} (Weekday: {site_date_obj.weekday()})")
                     except: pass
             
@@ -961,11 +1004,8 @@ class SkyCrawler:
                     }
                     
                     // Images (Deep scan)
-                    // Check standard imgs
                     const imgs = el.querySelectorAll('img');
                     imgs.forEach(img => {
-                         // Filter out logos/icons (simple heuristic size check difficult in pure JS w/o load)
-                         // But usually 9-bit content images are clean.
                          if (img.src && !results.treasure_img.includes(img.src)) {
                              results.treasure_img.push(img.src);
                          }
@@ -980,22 +1020,23 @@ class SkyCrawler:
                  
                  if (tElem) {
                     let container = tElem;
-                    if (tElem.tagName === 'STRONG') {
+                    // Fix: If STRONG is inside A (Anchor), go up to Parent (likely P or H3)
+                    if (container.parentElement && container.parentElement.tagName === 'A') {
+                         container = container.parentElement.parentElement; // Up from A -> P/Div
+                    } else if (tElem.tagName === 'STRONG') {
                         container = tElem.closest('p') || tElem.parentElement || tElem;
                     }
                     
+                    if (!container) container = tElem; // Fallback
+
                     // Scan Container
                     scanElement(container);
                     
-                    // Scan Next Siblings (Increased Range)
+                    // Scan Next Siblings 
                     let curr = container.nextElementSibling;
-                    let limit = 15; // Increased from 3
+                    let limit = 20; // Increased
                     while(curr && limit > 0) {
-                        // Stop if we hit another main header (H2)
-                        // But "Treasure" section might have H3/H4 inside... 
-                        // Usually 9-bit separates sections with H2 or CLEAR dividers.
                         if (curr.tagName === 'H2') break;
-                        
                         scanElement(curr);
                         curr = curr.nextElementSibling;
                         limit--;
@@ -1006,7 +1047,9 @@ class SkyCrawler:
                  let sElem = headings.find(h => h.innerText.includes('今日のシーズンキャンドル'));
                  if (sElem) {
                      let container = sElem;
-                     if (sElem.tagName === 'STRONG') {
+                      if (container.parentElement && container.parentElement.tagName === 'A') {
+                         container = container.parentElement.parentElement;
+                    } else if (sElem.tagName === 'STRONG') {
                         container = sElem.closest('p') || sElem.parentElement || sElem;
                      }
                      
@@ -1030,7 +1073,7 @@ class SkyCrawler:
                      
                      scanSeasonal(container);
                      let curr = container.nextElementSibling;
-                     let limit = 8; // Increased slightly
+                     let limit = 10; 
                      while(curr && limit > 0) {
                         if (curr.tagName === 'H2') break;
                         scanSeasonal(curr);
