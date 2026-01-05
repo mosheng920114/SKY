@@ -688,14 +688,28 @@ class SkyCrawler:
             page = await self.context.new_page()
             await page.route("**/*", lambda route: route.abort() if route.request.resource_type in ["font", "media", "websocket"] else route.continue_())
             
+            # 1. Access 9-bit Homepage
             await page.goto("https://9-bit.jp/skygold/", wait_until="domcontentloaded", timeout=60000)
             
-            # Extract 9-bit Data
+            # 2. Find Link to Today's Post (Same logic as get_daily_quests)
+            quest_url = await page.evaluate('''() => {
+                const links = Array.from(document.querySelectorAll('a'));
+                const target = links.find(a => a.innerText.includes('今日のデイリークエスト'));
+                return target ? target.href : null;
+            }''')
+            
+            if quest_url:
+                print(f"DEBUG: Found Daily Post URL for Candles: {quest_url}")
+                await page.goto(quest_url, wait_until="domcontentloaded")
+            else:
+                print("DEBUG: Could not find Daily Post text link, staying on Homepage (might be inaccurate).")
+
+            # 3. Extract Data from Current Page (Daily Post or Homepage)
             nine_bit_data = await page.evaluate('''() => {
                 const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
                 
                 // Treasure
-                const tHeaders = Array.from(document.querySelectorAll('h2, h3, h4')); // STRICT SELECTION
+                const tHeaders = Array.from(document.querySelectorAll('h2, h3, h4')); 
                 const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
                 if (tHeader) {
                     // Try to map text "暮土" etc
@@ -756,10 +770,14 @@ class SkyCrawler:
             # Process Treasure
             t_realm = nine_bit_data.get('treasure_realm', 'NotFound')
             t_imgs = [nine_bit_data['treasure_img']] if nine_bit_data.get('treasure_img') else []
-            t_rot = "Rotation 1" # 9-bit doesn't specify rotation explicitly in header usually, assume 1 or calc?
-            # 9-bit images usually show all locations.
-            # I will default to Rotation 1 if found.
+            t_rot = "Rotation 1" 
             
+            # SUNDAY CHECK: Force Double Candles (Rotation 1 and 2) if Sunday
+            now = datetime.now()
+            if now.weekday() == 6: # 0=Mon, 6=Sun
+                t_rot = "Rotation 1 and 2"
+                print(f"DEBUG: Sunday detected, forcing Double Treasure Candles ({t_realm})")
+
             # Process Seasonal
             s_realm = nine_bit_data.get('seasonal_realm', '')
             s_imgs = [nine_bit_data['seasonal_img']] if nine_bit_data.get('seasonal_img') else []
@@ -769,12 +787,11 @@ class SkyCrawler:
             if t_realm == "NotFound" or not t_realm:
                  try:
                     realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
-                    now = datetime.now()
                     anchor = datetime(2026, 1, 5)
                     diff = (now.date() - anchor.date()).days
                     idx = (diff + 3) % 5
                     t_realm = realms[idx]
-                    t_rot = "Rotation 1" 
+                    # If fallback runs and it's Sunday, t_rot is already set to "Rotation 1 and 2" above
                     print(f"DEBUG: Calculated Treasure Realm Fallback: {t_realm}")
                  except Exception as e:
                     print(f"Fallback Calc Error: {e}")
