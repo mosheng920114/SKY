@@ -244,14 +244,26 @@ class SkyCrawler:
                     );
                     
                     if (targetHeader) {
-                        // The image is likely in the same container or a sibling container
-                        // Traverse up to find a common wrapper, then look for img
-                        // Or looks like the header is INSIDE the card.
                         const card = targetHeader.closest('.column') || targetHeader.closest('.card') || targetHeader.parentElement;
                         if (card) img = card.querySelector('img');
                     }
+
+                    // Fallback 3: Search for "Clement's Map" (English)
+                    if (!img) {
+                        const headers = Array.from(document.querySelectorAll('h1, h2, h3, div'));
+                        const mapHeader = headers.find(h => h.innerText.includes("Clement's Map"));
+                        if (mapHeader) {
+                            const card = mapHeader.closest('.column') || mapHeader.parentElement;
+                            if (card) img = card.querySelector('img');
+                        }
+                    }
                 }
-                const imgUrl = img ? img.src : null;
+                
+                let imgUrl = img ? img.getAttribute('src') : null;
+                // Handle relative URL
+                if (imgUrl && imgUrl.startsWith('/')) {
+                    imgUrl = "https://sky-shards.pages.dev" + imgUrl;
+                }
                 
                 const statusText = document.querySelector('.shard-Countdown')?.innerText || "";
                 const rewardsEl = document.querySelector('.shard-Rewards');
@@ -674,11 +686,12 @@ class SkyCrawler:
             
             await page.goto("https://sky-children-of-the-light.fandom.com/wiki/Drafts/Dailies", wait_until="domcontentloaded", timeout=60000)
             
-            # Wait for content
+            # Wait for content - Fandom is heavy
             try:
-                await page.wait_for_selector('h2', timeout=20000)
+                await page.wait_for_load_state('networkidle', timeout=10000)
+                await page.wait_for_selector('h2', timeout=30000)
             except:
-                print("每日任務標題等待逾時")
+                print("每日任務標題等待逾時 (或被阻擋)")
 
             # Force Scroll
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
