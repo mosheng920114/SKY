@@ -767,35 +767,95 @@ class SkyCrawler:
             t_info = result['treasure']
             s_info = result['seasonal']
 
-            # Fallback for Treasure Realm (Date-based)
+            # Fallback: Scrape 9-bit if Fandom failed
+            if t_info['realm'] == "NotFound" or not t_info['realm']:
+                try:
+                    print("DEBUG: Fandom failed, trying 9-bit for Candles...")
+                    # Re-use page or new page? Page was closed.
+                    page = await self.context.new_page()
+                    await page.goto("https://9-bit.jp/skygold/", wait_until="domcontentloaded")
+                    
+                    nine_bit_data = await page.evaluate('''() => {
+                        const results = { treasure_img: null, treasure_realm: null, seasonal_img: null, seasonal_realm: null };
+                        
+                        // Treasure
+                        const tHeaders = Array.from(document.querySelectorAll('h1, h2, h3, h4, div'));
+                        const tHeader = tHeaders.find(h => h.innerText.includes('今日の日替わり大キャンドル'));
+                        if (tHeader) {
+                            // Try to map text "暮土" etc
+                            const text = tHeader.innerText;
+                            if (text.includes("草原")) results.treasure_realm = "Daylight Prairie";
+                            else if (text.includes("雨林")) results.treasure_realm = "Hidden Forest";
+                            else if (text.includes("峡谷")) results.treasure_realm = "Valley of Triumph";
+                            else if (text.includes("暮土") || text.includes("捨てられた地")) results.treasure_realm = "Golden Wasteland";
+                            else if (text.includes("書庫")) results.treasure_realm = "Vault of Knowledge";
+                            
+                            let curr = tHeader.nextElementSibling;
+                            let range = 0;
+                            while(curr && range < 5) {
+                                const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                                if (img) { results.treasure_img = img.src; break; }
+                                curr = curr.nextElementSibling;
+                                range++;
+                            }
+                        }
+                        
+                        // Seasonal
+                        const sHeader = tHeaders.find(h => h.innerText.includes('今日のシーズンキャンドル'));
+                        if (sHeader) {
+                             const text = sHeader.innerText;
+                             if (text.includes("草原")) results.seasonal_realm = "Daylight Prairie";
+                             else if (text.includes("雨林")) results.seasonal_realm = "Hidden Forest";
+                             else if (text.includes("峡谷")) results.seasonal_realm = "Valley of Triumph";
+                             else if (text.includes("暮土") || text.includes("捨てられた地")) results.seasonal_realm = "Golden Wasteland";
+                             else if (text.includes("書庫")) results.seasonal_realm = "Vault of Knowledge";
+
+                            let curr = sHeader.nextElementSibling;
+                            let range = 0;
+                            while(curr && range < 5) {
+                                const img = curr.querySelector('img') || (curr.tagName === 'IMG' ? curr : null);
+                                if (img) { results.seasonal_img = img.src; break; }
+                                curr = curr.nextElementSibling;
+                                range++;
+                            }
+                        }
+                        return results;
+                    }''')
+                    
+                    if nine_bit_data.get('treasure_realm'):
+                        t_info['realm'] = nine_bit_data['treasure_realm']
+                        print(f"DEBUG: 9-bit Treasure Realm: {t_info['realm']}")
+                    if nine_bit_data.get('treasure_img'):
+                        t_info['imgs'] = [nine_bit_data['treasure_img']]
+                        
+                    if nine_bit_data.get('seasonal_realm'):
+                        s_info['realm'] = nine_bit_data['seasonal_realm']
+                        print(f"DEBUG: 9-bit Seasonal Realm: {s_info['realm']}")
+                    if nine_bit_data.get('seasonal_img'):
+                        s_info['imgs'] = [nine_bit_data['seasonal_img']]
+                        
+                    await page.close()
+                except Exception as e:
+                    print(f"9-bit Fallback Error: {e}")
+
+            # Final Fallback for Treasure Realm (Date-based Text)
+            # Only if 9-bit also failed to get TEXT
             if t_info['realm'] == "NotFound" or not t_info['realm']:
                 try:
                     # Anchor: 2026-01-05 is Golden Wasteland (Index 3)
-                    # Realms: Prairie(0), Forest(1), Valley(2), Wasteland(3), Vault(4)
                     realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
                     now = datetime.now()
                     anchor = datetime(2026, 1, 5)
                     diff = (now.date() - anchor.date()).days
                     idx = (diff + 3) % 5
                     t_info['realm'] = realms[idx]
-                    t_info['rot'] = "Rotation 1" # Default fallback
+                    t_info['rot'] = "Rotation 1" 
                     print(f"DEBUG: Calculated Treasure Realm Fallback: {t_info['realm']}")
                 except Exception as e:
                     print(f"Fallback Calc Error: {e}")
 
-            # Fallback for Seasonal Realm (Usually matches Quest Realm, or Treasure - 1)
-            if s_info['realm'] == "NotFound" or not s_info['realm']:
-                try:
-                    # Anchor: 2026-01-05 Quest/Seasonal is Valley (Index 2)
-                    realms = ['Daylight Prairie', 'Hidden Forest', 'Valley of Triumph', 'Golden Wasteland', 'Vault of Knowledge']
-                    now = datetime.now()
-                    anchor = datetime(2026, 1, 5)
-                    diff = (now.date() - anchor.date()).days
-                    idx = (diff + 2) % 5
-                    s_info['realm'] = realms[idx]
-                    print(f"DEBUG: Calculated Seasonal Realm Fallback: {s_info['realm']}")
-                except:
-                    pass
+            # REMOVE SEASONAL FALLBACK (User says no season)
+            # if s_info['realm'] ... -> DELETED logic
 
             t_descs = candle_data.get_treasure_desc(t_info['realm'], t_info['rot'])
             s_descs = candle_data.get_seasonal_desc(s_info['realm']) 
