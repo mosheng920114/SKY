@@ -375,10 +375,10 @@ def generate_dashboard(shards, dailies, clock, quests=None):
     </div>
 
     <div class="grid-container">
-        <!-- Column 1: Shards & Quests -->
+        <!-- Column 1: Quests & Shards (Swapped) -->
         <div class="column-wrapper" style="display:flex; flex-direction:column; gap:20px;">
-            {shard_html}
             {quest_html}
+            {shard_html}
         </div>
         
         <!-- Column 2: Treasures -->

@@ -408,7 +408,18 @@ class SkyCrawler:
                 
                 # If neither active nor future found, and we have events, assume ended
                 if not active_event and not future_event:
-                    remaining = "今日所有爆發已結束"
+                    # Calculate time since last eruption ended
+                    last_end = parsed_events[-1][1]
+                    if current_dt > last_end:
+                        diff = current_dt - last_end
+                        total_seconds = int(diff.total_seconds())
+                        h = total_seconds // 3600
+                        m = (total_seconds % 3600) // 60
+                        s_sec = total_seconds % 60
+                        remaining = f"今日爆發已結束 (已過 {h}小時 {m}分 {s_sec}秒)"
+                    else:
+                        remaining = "今日所有爆發已結束" # Fallback if time mismatch
+                        
                     upcoming_range = f"{parsed_events[-1][2]} - {parsed_events[-1][3]}"
             else:
                  if not valid_eruptions:
@@ -1083,10 +1094,9 @@ class SkyCrawler:
                                                 // Fandom Lazy Loading: data-src usually holds the real URL
                                                 let src = img.getAttribute('data-src') || img.src;
                                                 if (src) {
-                                                    // Fandom specific cleanup: Remove /scale-to-width-down/... params to get full size?
-                                                    // Actually raw src is usually fine, but let's clean it just in case
-                                                    // example: .../image.jpg/revision/latest/scale-to-width-down/233?cb=...
-                                                    // leaving it as is usually works for download, but keeping "revision/latest" is safer.
+                                                    // HD FIX: Remove scaling parameters to get full resolution
+                                                    src = src.replace(/\/scale-to-width-down\/\d+/, '');
+                                                    src = src.split('?')[0]; // Remove cache busters/query params
                                                     results.images.push(src);
                                                 }
                                             });
