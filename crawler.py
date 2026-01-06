@@ -669,10 +669,16 @@ class SkyCrawler:
             '墓所': '墓園',
             '焚火': '篝火',
             '闇の蟹': '暗蟹',
-            '持ち上げる': '抱起'
+            '持ち上げる': '抱起',
+            
+            # Grammar Fixes
+            'を訪れる': '找到',
+            'にある': '位於',
+            'を': '' # Remove particle
         }
         
         # Apply Logic
+        # Specific overrides first
         if "30個" in text and "集める" in text:
             return "收集 30 滴燭火"
             
@@ -963,6 +969,8 @@ class SkyCrawler:
             raw_quests = quest_data_dom.get('quests', [])
             date_str = quest_data_dom.get('date_str', '')
             
+            print(f"DEBUG: Raw Quests from 9-bit: {raw_quests}")
+            
             # Parse Site Date
             site_date_obj = None
             if date_str:
@@ -972,13 +980,14 @@ class SkyCrawler:
                         m = int(date_match.group(1))
                         d = int(date_match.group(2))
                         # Assume 2025 unless we are in Dec and site is Jan
-                        year = 2025
+                        year = 2026
                         site_date_obj = datetime(year, m, d)
                         print(f"DEBUG: Parsed Date from Site Header: {site_date_obj.date()} (Weekday: {site_date_obj.weekday()})")
                     except: pass
             
             # Translate Quests
             quests = [self.translate_quest(q) for q in raw_quests]
+            print(f"DEBUG: Translated Quests: {quests}")
 
             # 3. Scrape Candles from Fandom Wiki (User Request)
             print("Navigating to Fandom Wiki for Candles...")
@@ -1041,9 +1050,11 @@ class SkyCrawler:
                             
                             // Regex to detect "Rotation 1", "and 1", "& 1" etc.
                             // Case insensitive, flexible whitespace
-                            const has1 = text.match(/Rotation\s*1|and\s*1|&\s*1|,\s*1/i);
-                            const has2 = text.match(/Rotation\s*2|and\s*2|&\s*2|,\s*2/i);
-                            const has3 = text.match(/Rotation\s*3|and\s*3|&\s*3|,\s*3/i);
+                            // Use results.rotation_str as text is out of scope
+                            const rText = results.rotation_str;
+                            const has1 = rText.match(/Rotation\s*1|and\s*1|&\s*1|,\s*1/i);
+                            const has2 = rText.match(/Rotation\s*2|and\s*2|&\s*2|,\s*2/i);
+                            const has3 = rText.match(/Rotation\s*3|and\s*3|&\s*3|,\s*3/i);
 
                             if (has1) rotsToGrab.push("ROTATION 1");
                             if (has2) rotsToGrab.push("ROTATION 2");
@@ -1126,7 +1137,7 @@ class SkyCrawler:
                 # Determine Rotation Key
                 t_rot = "Rotation 1"   
                 # Robust check for "1 and 2" using Regex on Python side too
-                import re
+                # import re (ALREADY IMPORTED GLOBALLY - REMOVING TO FIX ERROR)
                 lower_rot = f_rot_str.lower()
                 has_1 = re.search(r'rotation\s*1|and\s*1|&\s*1|,\s*1', lower_rot)
                 has_2 = re.search(r'rotation\s*2|and\s*2|&\s*2|,\s*2', lower_rot)
