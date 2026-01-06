@@ -553,6 +553,10 @@ class SkyCrawler:
         """
         # [Merged] Map Locations & Terms (Sorted by length to avoid partial replace)
         terms = {
+            # Specific Daily Overrides (High Priority - Full Sentence)
+            '捨てられた地の墓所で瞑想する': '在暮土的墓園裡冥想',
+            '捨てられた地の墓所にある焚火を訪れる': '前往暮土的墓園找到篝火',
+
             # Locations
             '孤島': '晨島', '草原': '雲野', '雨林': '雨林', '峡谷': '霞谷', 
             '捨てられた地': '暮土', '書庫': '禁閣',
