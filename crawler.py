@@ -167,7 +167,23 @@ class SkyCrawler:
             return None
             
         if not today_info.get('is_no_shard', False):
-            # Today has shard
+            # Today HAS a shard. Check if it is fully ended.
+            remaining_text = today_info.get('remaining', '')
+            if "已結束" in remaining_text:
+                # If ended, the user wants to see Tomorrow's shard immediately (Next Reset).
+                print("今日碎石已結束，查詢明日預報...")
+                next_date = today + timedelta(days=1)
+                tomorrow_info = await self.get_shards_info_by_date(next_date)
+                
+                if tomorrow_info and not tomorrow_info.get('is_no_shard', False):
+                    # Found tomorrow's shard. Return IT instead of today's ended card.
+                    # We might want to label it as "明日" (Tomorrow) clearly.
+                    date_str = next_date.strftime('%Y年%m月%d日')
+                    tomorrow_info['dateText'] = f"{date_str} (明日預報)"
+                    tomorrow_info['remaining'] = f"預報: 明日 {tomorrow_info['remaining']}"
+                    return tomorrow_info
+            
+            # If not ended, or tomorrow no shard, return Today's info
             return today_info
             
         # 2. If no shard today, look ahead (max 7 days)
