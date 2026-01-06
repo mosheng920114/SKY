@@ -1031,16 +1031,16 @@ class SkyCrawler:
                         if (realmHeader) {
                             // Determine which Rotations to grab
                             const rotsToGrab = [];
-                            if (results.rotation_str.includes("Rotation 1")) rotsToGrab.push("ROTATION 1");
                             
-                            // Fix: Handle "Rotation 1 AND 2" phrasing where "Rotation" is not repeated
-                            if (results.rotation_str.includes("Rotation 2") || results.rotation_str.toLowerCase().includes("and 2") || results.rotation_str.includes("& 2")) {
-                                rotsToGrab.push("ROTATION 2");
-                            }
-                            
-                            if (results.rotation_str.includes("Rotation 3") || results.rotation_str.toLowerCase().includes("and 3") || results.rotation_str.includes("& 3")) {
-                                rotsToGrab.push("ROTATION 3");
-                            }
+                            // Regex to detect "Rotation 1", "and 1", "& 1" etc.
+                            // Case insensitive, flexible whitespace
+                            const has1 = text.match(/Rotation\s*1|and\s*1|&\s*1|,\s*1/i);
+                            const has2 = text.match(/Rotation\s*2|and\s*2|&\s*2|,\s*2/i);
+                            const has3 = text.match(/Rotation\s*3|and\s*3|&\s*3|,\s*3/i);
+
+                            if (has1) rotsToGrab.push("ROTATION 1");
+                            if (has2) rotsToGrab.push("ROTATION 2");
+                            if (has3) rotsToGrab.push("ROTATION 3");
                             
                             // Iterate siblings to find Rotation Headers
                             let curr = realmHeader.nextElementSibling;
@@ -1118,11 +1118,12 @@ class SkyCrawler:
                 
                 # Determine Rotation Key
                 t_rot = "Rotation 1"   
-                # Robust check for "1 and 2"
+                # Robust check for "1 and 2" using Regex on Python side too
+                import re
                 lower_rot = f_rot_str.lower()
-                has_1 = "rotation 1" in lower_rot
-                has_2 = "rotation 2" in lower_rot or "and 2" in lower_rot or "& 2" in lower_rot
-                has_3 = "rotation 3" in lower_rot or "and 3" in lower_rot
+                has_1 = re.search(r'rotation\s*1|and\s*1|&\s*1|,\s*1', lower_rot)
+                has_2 = re.search(r'rotation\s*2|and\s*2|&\s*2|,\s*2', lower_rot)
+                has_3 = re.search(r'rotation\s*3|and\s*3|&\s*3|,\s*3', lower_rot)
                 
                 if has_1 and has_2: t_rot = "Rotation 1 and 2"
                 elif has_1: t_rot = "Rotation 1"
