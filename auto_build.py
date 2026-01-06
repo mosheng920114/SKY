@@ -7,6 +7,10 @@ import web_exporter
 async def main():
     print("Starting auto_build process...")
     
+    # Ensure images directory exists (Prevent git add failure if scraper crashes)
+    if not os.path.exists("images"):
+        os.makedirs("images")
+    
     # 1. Initialize Crawler
     crawler = SkyCrawler()
     
