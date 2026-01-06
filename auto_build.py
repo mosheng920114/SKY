@@ -11,6 +11,10 @@ async def main():
     if not os.path.exists("images"):
         os.makedirs("images")
     
+    # Create .gitkeep to ensure git add images/ always succeeds even if empty
+    with open(os.path.join("images", ".gitkeep"), "w") as f:
+        pass
+    
     # 1. Initialize Crawler
     crawler = SkyCrawler()
     
