@@ -558,13 +558,23 @@ class SkyCrawler:
             # print(f"DEBUG: Dates found in page: {date_matches}")
 
             extracted_quests = candidates[:4] if len(candidates) >= 4 else candidates 
-            # print(f"DEBUG: All Candidates: {candidates}")
-            # print(f"DEBUG: Selected: {extracted_quests}")
             
+            # Extract Treasure Candle Location (9-bit Source)
+            treasure_info = ""
+            for line in lines:
+                if "大キャンドル" in line:
+                    treasure_info = line.strip()
+                    break
+            
+            print(f"DEBUG: 9-bit Treasure Info: {treasure_info}")
+
             # Translate to TC
             translated_quests = [self.translate_quest(q) for q in extracted_quests]
             
-            return translated_quests 
+            return {
+                'quests': translated_quests, 
+                'treasure_info': treasure_info
+            } 
 
 
 
@@ -583,6 +593,20 @@ class SkyCrawler:
             # Specific Daily Overrides (High Priority - Full Sentence)
             '捨てられた地の墓所で瞑想する': '在暮土的墓園裡冥想',
             '捨てられた地の墓所にある焚火を訪れる': '前往暮土的墓園找到篝火',
+            
+            # Vault Specific
+            '書庫で虹のキャンドルを見つける': '找到禁閣的彩虹蠟燭',
+            '書庫の4階で３つの光を捕まえる': '在禁閣上層捕捉四散的光', # Exact match for 9-bit text
+            '書庫の4階で光をつかまえる': '在禁閣上層捕捉四散的光', # Custom mapping for broken JP
+            '書庫で祈る侍者の記憶を呼び起こす': '重溫祈禱聖徒在禁閣的記憶',
+            '虹': '彩虹', # Explicitly adding it here since grep failed, but I will strip double later
+            
+            # Additional broken terms observed in user screenshots
+            '虹のキャンドル': '彩虹蠟燭', 
+            '見つける': '找到',
+            '4階': '四樓', 
+            '祈る侍者': '祈禱聖徒',
+            '３つの': '3個', # Generic quantity fix
 
             # Locations
             '孤島': '晨島', '草原': '雲野', '雨林': '雨林', '峡谷': '霞谷', 
@@ -723,6 +747,9 @@ class SkyCrawler:
         text = text.replace('在在', '在').replace('的在', '在').replace('任務任務', '任務')
         text = text.replace('重溫美好回憶先祖', '重溫先祖美好回憶').replace('重溫先祖美好回憶任務', '重溫先祖美好回憶')
         
+        # Post-Processing Cleanup for Overlaps
+        text = text.replace('彩彩虹', '彩虹')
+            
         return text
 
     async def get_dailies_info(self):
@@ -1019,6 +1046,92 @@ class SkyCrawler:
             # Translate Quests
             quests = [self.translate_quest(q) for q in raw_quests]
             print(f"DEBUG: Translated Quests: {quests}")
+            
+            # Extract Treasure Candle Info from 9-bit (More reliable than Fandom Text)
+            # We look for "大キャンドル" in the raw text lines
+            # Update: Scan for Realm keywords in the Vicinity of "大キャンドル"
+            treasure_jp = ""
+            full_text = await page.evaluate("document.body.innerText")
+            lines = full_text.split('\n')
+            
+            for i, line in enumerate(lines):
+                if "大キャンドル" in line:
+                    # Captures context (current line + next 5 lines) to find location
+                    context = " ".join(lines[i:i+6])
+                    treasure_jp = context.strip()
+                    break
+            
+            print(f"DEBUG: 9-bit Candle Info (Context): {treasure_jp}")
+            
+            # Determine Target Realm & Rotation Mode
+            target_realm = None
+            force_double_rot = False
+            
+            jp_realm_map = {
+                '書庫': 'Vault of Knowledge',
+                '捨てられた地': 'Golden Wasteland',
+                '峡谷': 'Valley of Triumph',
+                '雨林': 'Hidden Forest',
+                '草原': 'Daylight Prairie',
+                '孤島': 'Isle of Dawn'
+            }
+            
+            # Determine Quest Realm (Heuristic: Most frequent realm in quests)
+            realm_counts = {
+                'Vault of Knowledge': 0, 'Golden Wasteland': 0, 'Valley of Triumph': 0,
+                'Hidden Forest': 0, 'Daylight Prairie': 0, 'Isle of Dawn': 0
+            }
+            tc_realm_map = {
+                '禁閣': 'Vault of Knowledge', '暮土': 'Golden Wasteland', '霞谷': 'Valley of Triumph',
+                '雨林': 'Hidden Forest', '雲野': 'Daylight Prairie', '晨島': 'Isle of Dawn'
+            }
+            
+            for q in quests:
+                for zh, en in tc_realm_map.items():
+                    if zh in q:
+                        realm_counts[en] += 1
+            
+            # Get max key
+            quest_realm = max(realm_counts, key=realm_counts.get)
+            if realm_counts[quest_realm] == 0:
+                quest_realm = None # No realm detected
+                
+            print(f"DEBUG: Inferred Quest Realm: {quest_realm}")
+
+            # 9-bit Text Scanning (Restored Logic)
+            target_realm = None
+            force_double_rot = False
+            
+            # Note: jp_realm_map is defined above in the file? 
+            # If not, verify context. It was defined in lines ~1060.
+            # Just closely check if it is still there. 
+            # If I am unsure, I will redefine it here for safety.
+            jp_realm_map_scan = {
+                '書庫': 'Vault of Knowledge',
+                '捨てられた地': 'Golden Wasteland',
+                '峡谷': 'Valley of Triumph',
+                '雨林': 'Hidden Forest',
+                '草原': 'Daylight Prairie',
+                '孤島': 'Isle of Dawn'
+            }
+            
+            for jp, en in jp_realm_map_scan.items():
+                if jp in treasure_jp:
+                    target_realm = en
+                    break
+            
+            if '2箇所' in treasure_jp or '二箇所' in treasure_jp or '2つのエリア' in treasure_jp:
+                force_double_rot = True
+
+            # Resolve Target Realm check
+            if not target_realm and quest_realm:
+                 print(f"DEBUG: Text scan failed. Fallback to Quest Realm: {quest_realm}")
+                 target_realm = quest_realm
+                 
+            # Also assume Seasonal Candle is in Quest Realm
+            seasonal_realm_override = quest_realm
+            
+            print(f"DEBUG: Final Candle Realm: {target_realm}, Force Double: {force_double_rot}")
 
             # 3. Scrape Candles from Fandom Wiki (User Request)
             print("Navigating to Fandom Wiki for Candles...")
@@ -1026,48 +1139,51 @@ class SkyCrawler:
                 await page.goto("https://sky-children-of-the-light.fandom.com/wiki/Treasure_Candles", wait_until="domcontentloaded", timeout=60000)
                 await page.wait_for_selector('#mw-content-text', timeout=10000)
                 
-                fandom_data = await page.evaluate('''() => {
+                # Pass External Overrides
+                fandom_data = await page.evaluate('''([targetRealm, forceDouble]) => {
                     const results = { 
-                        realm: null, 
-                        rotation_str: null,
+                        realm: targetRealm, // Default to externally resolved realm
+                        rotation_str: "Detected from 9-bit: " + (targetRealm || "None"),
                         images: [],
-                        seasonal_realm: null // Fandom might not show seasonal easily on this page, strictly Treasure
+                        seasonal_realm: null 
                     };
                     
                     const content = document.querySelector('#mw-content-text');
                     if (!content) return results;
 
-                    // 1. Find "Today's ... Rotation" Text
-                    // Look for specific elements usually holding the update text
-                    // Avoid 'div' to prevent matching the whole page container
-                    const ps = Array.from(content.querySelectorAll('p, b, center, span, font'));
-                    
-                    // Filter: Must contain keywords and be reasonably short (not a whole section)
-                    const rotInfo = ps.find(el => 
-                        el.innerText.includes("Today's") && 
-                        el.innerText.includes("Treasure Candle rotation") &&
-                        el.innerText.length < 500
-                    );
-                    
-                    if (rotInfo) {
-                        let text = rotInfo.innerText;
+                    // 1. Find "Today's ... Rotation" Text (ONLY if not externally resolved)
+                    if (!targetRealm) {
+                        // Look for specific elements usually holding the update text
+                        // Avoid 'div' to prevent matching the whole page container
+                        const ps = Array.from(content.querySelectorAll('p, b, center, span, font'));
                         
-                        // Fix: If text is truncated or split (e.g. inside <b>), it might miss the Realm/Rotation
-                        // Check parent if "Golden" or "Rotation" is missing
-                        if (!text.includes("Rotation") || (!text.includes("Golden") && !text.includes("Prairie") && !text.includes("Forest") && !text.includes("Valley") && !text.includes("Vault"))) {
-                            if (rotInfo.parentElement) {
-                                text = rotInfo.parentElement.innerText;
+                        // Filter: Must contain keywords and be reasonably short (not a whole section)
+                        const rotInfo = ps.find(el => 
+                            el.innerText.includes("Today's") && 
+                            el.innerText.includes("Treasure Candle rotation") &&
+                            el.innerText.length < 500
+                        );
+                        
+                        if (rotInfo) {
+                            let text = rotInfo.innerText;
+                            
+                            // Fix: If text is truncated or split (e.g. inside <b>), it might miss the Realm/Rotation
+                            // Check parent if "Golden" or "Rotation" is missing
+                            if (!text.includes("Rotation") || (!text.includes("Golden") && !text.includes("Prairie") && !text.includes("Forest") && !text.includes("Valley") && !text.includes("Vault"))) {
+                                if (rotInfo.parentElement) {
+                                    text = rotInfo.parentElement.innerText;
+                                }
                             }
+                            
+                            results.rotation_str = text; 
+                            
+                            // Parse Realm (Order shouldn't matter if text is short, but specific order helps)
+                            if (text.includes("Golden Wasteland")) results.realm = "Golden Wasteland";
+                            else if (text.includes("Daylight Prairie")) results.realm = "Daylight Prairie";
+                            else if (text.includes("Hidden Forest")) results.realm = "Hidden Forest";
+                            else if (text.includes("Valley of Triumph")) results.realm = "Valley of Triumph";
+                            else if (text.includes("Vault of Knowledge")) results.realm = "Vault of Knowledge";
                         }
-                        
-                        results.rotation_str = text; 
-                        
-                        // Parse Realm (Order shouldn't matter if text is short, but specific order helps)
-                        if (text.includes("Golden Wasteland")) results.realm = "Golden Wasteland";
-                        else if (text.includes("Daylight Prairie")) results.realm = "Daylight Prairie";
-                        else if (text.includes("Hidden Forest")) results.realm = "Hidden Forest";
-                        else if (text.includes("Valley of Triumph")) results.realm = "Valley of Triumph";
-                        else if (text.includes("Vault of Knowledge")) results.realm = "Vault of Knowledge";
                     }
                     
                     // 2. Extract Images based on Realm and Rotation
@@ -1082,14 +1198,24 @@ class SkyCrawler:
                             // Regex to detect "Rotation 1", "and 1", "& 1" etc.
                             // Case insensitive, flexible whitespace
                             // Use results.rotation_str as text is out of scope
-                            const rText = results.rotation_str;
+                            const rText = results.rotation_str || "Rotation 1"; // Fallback
                             const has1 = rText.match(/Rotation\s*1|and\s*1|&\s*1|,\s*1/i);
                             const has2 = rText.match(/Rotation\s*2|and\s*2|&\s*2|,\s*2/i);
                             const has3 = rText.match(/Rotation\s*3|and\s*3|&\s*3|,\s*3/i);
 
-                            if (has1) rotsToGrab.push("ROTATION 1");
-                            if (has2) rotsToGrab.push("ROTATION 2");
-                            if (has3) rotsToGrab.push("ROTATION 3");
+                            if (forceDouble) {
+                                // If 9-bit says "2 places" or logic dictates, Grab 1 and 2
+                                rotsToGrab.push("ROTATION 1");
+                                rotsToGrab.push("ROTATION 2");
+                            } else {
+                                // Standard Logic
+                                if (has1) rotsToGrab.push("ROTATION 1");
+                                if (has2) rotsToGrab.push("ROTATION 2");
+                                if (has3) rotsToGrab.push("ROTATION 3");
+                                
+                                // Default to 1 if nothing found and we have a realm
+                                if (rotsToGrab.length === 0) rotsToGrab.push("ROTATION 1");
+                            }
                             
                             // Iterate siblings to find Rotation Headers
                             let curr = realmHeader.nextElementSibling;
@@ -1125,7 +1251,7 @@ class SkyCrawler:
                     }
                     
                     return results;
-                }''')
+                }''', [target_realm, force_double_rot])
                 
                 # Process Fandom Data
                 t_realm = fandom_data.get('realm', 'Golden Wasteland') # Fallback if parse fails
