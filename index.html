@@ -163,32 +163,41 @@
 
     <div class="header">
         <h1>Sky: Children of the Light</h1>
-        <div class="timestamp">更新時間 (Updated)：2026-07-07 11:13:50</div>
+        <div class="timestamp">更新時間 (Updated)：2026-07-08 10:22:55</div>
     </div>
 
     <div class="grid-container">
         <!-- Column 1: Quests & Shards (Swapped) -->
         <div class="column-wrapper" style="display:flex; flex-direction:column; gap:20px;">
-            <div class="card error">無法獲取每日任務</div>
+            
+        <div class="card">
+            <div class="card-header">
+                <h2>每日任務 (Quests)</h2>
+            </div>
+            <div class="card-body">
+                <div class="quest-list"><div class="quest-item"><span class="num">1</span> 點亮 20 根蠟燭</div><div class="quest-item"><span class="num">2</span> 樹屋在彷徨う抓住之光</div><div class="quest-item"><span class="num">3</span> 透過光菇重新恢復能量</div><div class="quest-item"><span class="num">4</span> 他的玩家和感情表現使う</div></div>
+            </div>
+        </div>
+        
             
         <div class="card">
             <div class="card-header">
                 <h2>每日碎石 (Shards)</h2>
                 <div class="row-center">
-                     <span class="badge 黑石 (Black) (預報: 2026年07月08日)">黑石 (Black) (預報: 2026年07月08日)</span>
+                     <span class="badge 黑石 (Black)">黑石 (Black)</span>
                 </div>
             </div>
             <div class="card-body">
-                <div class="info-row highlight-row"><strong>日期：</strong> 2026年7月7日 星期二</div>
+                <div class="info-row highlight-row"><strong>日期：</strong> 2026年7月8日 星期三</div>
                 <div class="info-row"><strong>地圖：</strong> 霞谷 的 溜冰場(冰封湖)</div>
                 <div class="info-row"><strong>獎勵：</strong> <span class="rewards-text">獎勵為 4 個大蠟燭</span></div>
                 <div class="info-row"><strong>時間：</strong> 上午08:58:40 - 下午12:50:00</div>
-                <div class="info-row"><strong>狀態：</strong> 下一場: 2026年07月08日</div>
+                <div class="info-row"><strong>狀態：</strong> 進行中! 距離結束: 2小時 27分 6秒</div>
                 <div class="eruptions-list">
                     <strong>爆發時間 (24H)：</strong>
                     <div class="tags"><span class="tag">下午04:58:40 - 下午08:50:00</span><span class="tag">上午12:58:40 - 上午04:50:00</span><span class="tag">上午08:58:40 - 下午12:50:00</span></div>
                 </div>
-                <img src="https://sky-shards.pages.dev/icons/appName.webp" onclick="openModal(this.src)" class="shard-img">
+                <img src="https://sky-shards.pages.dev/infographics/map_varient_clement/valley.rink.0.webp" onclick="openModal(this.src)" class="shard-img">
             </div>
         </div>
         
@@ -199,10 +208,30 @@
         <div class="card">
             <div class="card-header">
                 <h2>大蠟燭 (Treasure)</h2>
-                <span class="subtitle">NotFound | Rotation 1</span>
+                <span class="subtitle">Valley of Triumph | Rotation 2</span>
             </div>
             <div class="card-body scrollable">
-                <div class="desc-list"></div><div class="img-grid"></div>
+                <div class="pair-grid">
+                <div class="pair-item">
+                    <div class="desc"><span class="num">1</span> 社交空間/大廳：位於區域右側，滑道起點處。</div>
+                    <img src="images/treasure_1.png" onclick="openModal(this.src)">
+                </div>
+                
+                <div class="pair-item">
+                    <div class="desc"><span class="num">2</span> 溜冰場：位於冰面上，在橋樑的左側。</div>
+                    <img src="images/treasure_2.png" onclick="openModal(this.src)">
+                </div>
+                
+                <div class="pair-item">
+                    <div class="desc"><span class="num">3</span> 霞光城/城堡：經過最高的拱門後，位於第二個平臺上。</div>
+                    <img src="images/treasure_3.png" onclick="openModal(this.src)">
+                </div>
+                
+                <div class="pair-item">
+                    <div class="desc"><span class="num">4</span> 競技場/體育館：位於右側邊緣，看臺底部。</div>
+                    <img src="images/treasure_4.png" onclick="openModal(this.src)">
+                </div>
+                </div>
             </div>
         </div>
         
@@ -213,7 +242,7 @@
         <div class="card">
             <div class="card-header">
                 <h2>季節蠟燭 (Seasonal)</h2>
-                <span class="subtitle"> | Rotation 1</span>
+                <span class="subtitle">Unknown | Rotation 1</span>
             </div>
             <div class="card-body scrollable">
                 <div class="desc-list"></div><div class="img-grid"></div>
@@ -227,7 +256,7 @@
             </div>
             <div class="card-body">
                 
-            <div class="event-row" id="event-geyser" data-seconds="6760">
+            <div class="event-row" id="event-geyser" data-seconds="2529">
                 <div class="event-name">噴泉 (Geyser)</div>
                 <div class="event-time">下次: 11:05</div>
                 <div class="event-countdown">--:--:--</div>
@@ -235,7 +264,7 @@
             </div>
             
                 
-            <div class="event-row" id="event-grandma" data-seconds="1359">
+            <div class="event-row" id="event-grandma" data-seconds="4329">
                 <div class="event-name">奶奶 (Grandma)</div>
                 <div class="event-time">下次: 11:35</div>
                 <div class="event-countdown">--:--:--</div>
@@ -243,7 +272,7 @@
             </div>
             
                 
-            <div class="event-row" id="event-turtle" data-seconds="2259">
+            <div class="event-row" id="event-turtle" data-seconds="5229">
                 <div class="event-name">海龜 (Turtle)</div>
                 <div class="event-time">下次: 11:50</div>
                 <div class="event-countdown">--:--:--</div>
